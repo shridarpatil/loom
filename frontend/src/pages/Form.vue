@@ -27,24 +27,50 @@ const showDeleteConfirm = ref(false);
 const showSubmitConfirm = ref(false);
 const showCancelConfirm = ref(false);
 
+interface CustomButton {
+  label: string;
+  action: (doc: Record<string, unknown>) => void;
+  variant?: string;
+  view?: string;
+}
+
 const clientScriptFns = ref<{
   validate?: (doc: Record<string, unknown>) => string | undefined | void;
   on_change?: (doc: Record<string, unknown>, fieldname: string) => void;
 }>({});
+const customButtons = ref<CustomButton[]>([]);
 
 function loadClientScript(script: string) {
-  if (!script) { clientScriptFns.value = {}; return; }
+  if (!script) { clientScriptFns.value = {}; customButtons.value = []; return; }
   try {
-    const sandbox: Record<string, unknown> = {};
+    const buttons: CustomButton[] = [];
+    const sandbox: Record<string, unknown> = {
+      // loom.add_button(label, action, options?)
+      // options.view: "form" | "list" | "both" (default: "both")
+      add_button(label: string, action: (doc: Record<string, unknown>) => void, options?: { variant?: string; view?: string }) {
+        buttons.push({ label, action, variant: options?.variant || "secondary", view: options?.view || "both" });
+      },
+    };
     const fn = new Function("loom", script);
     fn(sandbox);
     clientScriptFns.value = {
       validate: sandbox.validate as typeof clientScriptFns.value.validate,
       on_change: sandbox.on_change as typeof clientScriptFns.value.on_change,
     };
+    // Only show buttons meant for form view
+    customButtons.value = buttons.filter((b) => b.view === "form" || b.view === "both");
   } catch (e) {
     console.error("Client script error:", e);
     clientScriptFns.value = {};
+    customButtons.value = [];
+  }
+}
+
+function runCustomButton(btn: CustomButton) {
+  try {
+    btn.action(doc.value);
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : "Button action failed";
   }
 }
 
@@ -236,6 +262,15 @@ onUnmounted(() => socket.off("doc_update", onDocUpdate));
         </button>
       </template>
       <template #actions>
+        <!-- Custom buttons from client script -->
+        <LButton
+          v-for="(btn, i) in customButtons"
+          :key="'cb-' + i"
+          :variant="(btn.variant as any) || 'secondary'"
+          size="sm"
+          @click="runCustomButton(btn)"
+        >{{ btn.label }}</LButton>
+
         <LBadge
           v-if="isSubmittable && !isNew"
           :color="docstatusColor"

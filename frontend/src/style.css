@@ -12,13 +12,13 @@
   --color-primary-800: #3730a3;
   --color-primary-900: #312e81;
   --color-surface: #ffffff;
-  --color-surface-muted: #f9fafb;
-  --color-surface-raised: #f3f4f6;
-  --color-border: #e5e7eb;
-  --color-border-strong: #d1d5db;
-  --color-text: #111827;
-  --color-text-muted: #6b7280;
-  --color-text-light: #9ca3af;
+  --color-surface-muted: #f8fafc;
+  --color-surface-raised: #f1f5f9;
+  --color-border: #e2e8f0;
+  --color-border-strong: #cbd5e1;
+  --color-text: #0f172a;
+  --color-text-muted: #64748b;
+  --color-text-light: #94a3b8;
   --color-danger: #ef4444;
   --color-danger-light: #fef2f2;
   --color-success: #10b981;
@@ -38,7 +38,7 @@
       sans-serif;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     font-size: 14px;
-    line-height: 1.5;
+    line-height: 1.6;
     letter-spacing: -0.011em;
   }
 
@@ -47,8 +47,8 @@
   }
 
   ::-webkit-scrollbar {
-    width: 5px;
-    height: 5px;
+    width: 6px;
+    height: 6px;
   }
 
   ::-webkit-scrollbar-track {
@@ -56,14 +56,52 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-border-strong/50 rounded-full;
+    @apply bg-border-strong/40 rounded-full;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-text-light;
+    @apply bg-text-light/60;
   }
 
   input, select, textarea, button {
     font-size: inherit;
   }
 }
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(100%); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes toastOut {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(100%); }
+}
+
+.animate-fade-in { animation: fadeIn 0.2s ease-out; }
+.animate-slide-up { animation: slideUp 0.25s ease-out; }
+.animate-slide-down { animation: slideDown 0.2s ease-out; }
+.animate-scale-in { animation: scaleIn 0.2s ease-out; }
+.animate-toast-in { animation: toastIn 0.3s ease-out; }
+.animate-toast-out { animation: toastOut 0.2s ease-in forwards; }

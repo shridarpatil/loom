@@ -2,6 +2,7 @@
 defineProps<{
   open: boolean;
   title: string;
+  size?: "sm" | "md" | "lg";
 }>();
 
 defineEmits<{
@@ -11,15 +12,42 @@ defineEmits<{
 
 <template>
   <Teleport to="body">
-    <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center">
-      <div class="absolute inset-0 bg-black/20" @click="$emit('close')" />
-      <div class="relative bg-white rounded-lg shadow-lg border border-border p-5 w-[360px]">
-        <h3 class="text-[14px] font-semibold mb-1.5">{{ title }}</h3>
-        <slot />
-        <div v-if="$slots.footer" class="flex justify-end gap-1.5 mt-4">
-          <slot name="footer" />
+    <Transition name="modal">
+      <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <!-- Backdrop -->
+        <div class="absolute inset-0 bg-black/30 backdrop-blur-[2px] animate-fade-in" @click="$emit('close')" />
+
+        <!-- Dialog -->
+        <div
+          :class="[
+            'relative bg-white rounded-xl shadow-2xl shadow-black/10 border border-border/50 animate-scale-in',
+            size === 'lg' ? 'w-[560px]' : size === 'sm' ? 'w-[320px]' : 'w-[420px]',
+          ]"
+        >
+          <!-- Header -->
+          <div class="flex items-center justify-between px-5 pt-5 pb-0">
+            <h3 class="text-[15px] font-semibold text-text">{{ title }}</h3>
+            <button
+              class="p-1 -mr-1 rounded-md text-text-light hover:text-text hover:bg-surface-raised transition-colors"
+              @click="$emit('close')"
+            >
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <!-- Body -->
+          <div class="px-5 py-4">
+            <slot />
+          </div>
+
+          <!-- Footer -->
+          <div v-if="$slots.footer" class="flex items-center justify-end gap-2 px-5 pb-5 pt-0">
+            <slot name="footer" />
+          </div>
         </div>
       </div>
-    </div>
+    </Transition>
   </Teleport>
 </template>

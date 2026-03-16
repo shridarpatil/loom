@@ -223,11 +223,49 @@ const fieldNames = computed(() => {
   return [...new Set(names)];
 });
 
+// --- Custom buttons from client script ---
+interface CustomButton {
+  label: string;
+  action: (selectedRows: Record<string, unknown>[]) => void;
+  variant?: string;
+  view?: string;
+}
+const customButtons = ref<CustomButton[]>([]);
+
+function loadClientScript(script: string) {
+  if (!script) { customButtons.value = []; return; }
+  try {
+    const buttons: CustomButton[] = [];
+    const sandbox: Record<string, unknown> = {
+      add_button(label: string, action: (selectedRows: Record<string, unknown>[]) => void, options?: { variant?: string; view?: string }) {
+        buttons.push({ label, action, variant: options?.variant || "secondary", view: options?.view || "both" });
+      },
+    };
+    const fn = new Function("loom", script);
+    fn(sandbox);
+    // Only show buttons meant for list view
+    customButtons.value = buttons.filter((b) => b.view === "list" || b.view === "both");
+  } catch (e) {
+    console.error("Client script error:", e);
+    customButtons.value = [];
+  }
+}
+
+function runCustomButton(btn: CustomButton) {
+  try {
+    const selected = rows.value.filter((r) => selectedIds.value.has(String(r.id)));
+    btn.action(selected);
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : "Button action failed";
+  }
+}
+
 // --- Data loading ---
 async function loadMeta() {
   try {
     const res = await loom.getMeta(props.doctype);
     meta.value = res.data;
+    loadClientScript((res.data as any).client_script || "");
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : "Failed to load meta";
   }
@@ -447,6 +485,15 @@ onUnmounted(() => socket.off("doc_update", onDocUpdate));
     <!-- Header -->
     <LPageHeader :title="doctype" :subtitle="!loading ? `${rows.length}${rows.length >= pageSize ? '+' : ''} records` : undefined">
       <template #actions>
+        <!-- Custom buttons from client script -->
+        <LButton
+          v-for="(btn, i) in customButtons"
+          :key="'cb-' + i"
+          :variant="(btn.variant as any) || 'secondary'"
+          size="sm"
+          @click="runCustomButton(btn)"
+        >{{ btn.label }}</LButton>
+
         <template v-if="isAdmin() && doctype !== 'DocType'">
           <LButton variant="secondary" @click="router.push(`/app/DocType/${doctype}`)">Edit DocType</LButton>
           <LButton variant="secondary" @click="router.push(`/app/customize-form/${doctype}`)">Customize</LButton>
