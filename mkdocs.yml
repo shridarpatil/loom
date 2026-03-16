@@ -1,10 +1,10 @@
-docs_dir: .
-site_dir: ../_site
+docs_dir: docs
+site_dir: site
 site_name: Loom Framework
 site_description: A metadata-driven application framework in Rust
-site_url: https://anthropics.github.io/loom/
-repo_url: https://github.com/anthropics/loom
-repo_name: anthropics/loom
+site_url: https://shridarpatil.github.io/loom/
+repo_url: https://github.com/shridarpatil/loom
+repo_name: shridarpatil/loom
 
 theme:
   name: material

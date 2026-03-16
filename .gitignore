@@ -24,6 +24,7 @@ sites/uploads/
 .env
 
 # Docs build
+/site
 /docs/_site
 /_site
 
