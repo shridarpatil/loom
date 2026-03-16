@@ -96,6 +96,39 @@ In the parent DocType, add a Table field:
 
 Nested child tables are supported — a child DocType can itself contain Table fields.
 
+## Core DocTypes
+
+Loom ships with built-in DocTypes in the `core_doctypes/` directory at the project root:
+
+- **User** — User accounts with email, password, and role assignments. The `Administrator` user is seeded automatically on `new-site` and `migrate`.
+- **Role** — Roles for the permission system. Default roles (Administrator, System Manager, All, Guest) are seeded automatically.
+
+Core DocTypes are loaded before app DocTypes and take precedence over database versions. They are defined as JSON files just like app DocTypes:
+
+```
+core_doctypes/
+├── user/
+│   └── user.json
+└── role/
+    └── role.json
+```
+
+## Table Names
+
+Database table names are derived from the DocType name using snake_case conversion. For example:
+
+| DocType Name | Table Name |
+|-------------|------------|
+| `Todo` | `todo` |
+| `Leave Application` | `leave_application` |
+| `Invoice Item` | `invoice_item` |
+
+System tables used by the framework are prefixed with `__` (e.g., `__doctype`, `__user`, `__script`).
+
+## Developer Mode and JSON Export
+
+When `developer_mode` is enabled in site_config.json, editing a DocType from the Desk UI or API will auto-export the updated JSON back to the app's `doctypes/` directory. This keeps your filesystem in sync with the database during development.
+
 ## Submittable Documents
 
 Set `is_submittable: true` for documents that follow a Draft → Submitted → Cancelled workflow.

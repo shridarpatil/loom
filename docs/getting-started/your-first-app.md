@@ -1,6 +1,6 @@
 # Your First App
 
-Apps in Loom are directories containing JSON DocType definitions, Rhai scripts, and optional WASM plugins. **No Rust toolchain is needed to develop or install apps.**
+Apps in Loom are directories containing JSON DocType definitions and Rhai scripts. **No Rust toolchain is needed to develop or install apps.**
 
 ## Scaffold an App
 

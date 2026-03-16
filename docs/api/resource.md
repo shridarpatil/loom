@@ -115,5 +115,5 @@ When using array-format filters `[field, operator, value]`:
 | `in` | In array: `["status", "in", ["Open", "Draft"]]` |
 | `not in` | Not in array |
 | `between` | Range: `["date", "between", ["2026-01-01", "2026-12-31"]]` |
-| `is null` | Is NULL |
-| `is not null` | Is not NULL |
+| `is` | Is NULL: `["field", "is", null]` |
+| `is not` | Is not NULL: `["field", "is not", null]` |

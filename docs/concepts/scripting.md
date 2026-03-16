@@ -177,6 +177,78 @@ Content-Type: application/json
 {"employee": "EMP-001"}
 ```
 
+## Client Scripts
+
+Client scripts run in the browser and add UI behavior to DocType forms and list views. Place a `.client.js` file next to the DocType JSON:
+
+```
+my_app/doctypes/todo/
+├── todo.json
+└── todo.client.js
+```
+
+### loom.validate
+
+Run validation before save. Return a string to block the save and show an error.
+
+```javascript
+loom.validate = function(doc) {
+  if (!doc.title || doc.title.trim() === "") {
+    return "Title is required";
+  }
+};
+```
+
+### loom.add_button
+
+Add custom action buttons to the form view, list view, or both.
+
+```javascript
+loom.add_button(label, callback, options)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `label` | string | Button text |
+| `callback` | function | Called with `doc` (form) or `selectedRows` (list) |
+| `options.variant` | string | `"primary"`, `"secondary"`, etc. |
+| `options.view` | string | `"form"`, `"list"`, or `"both"` (default: `"both"`) |
+
+```javascript
+// Form only — receives the current document
+loom.add_button("Approve", function(doc) {
+  doc.status = "Approved";
+}, { variant: "primary", view: "form" });
+
+// List only — receives selected rows
+loom.add_button("Bulk Close", function(selectedRows) {
+  alert("Closing " + selectedRows.length + " items");
+}, { view: "list" });
+
+// Both views
+loom.add_button("Print", function(docOrRows) {
+  // ...
+}, { view: "both" });
+```
+
+### loom.on_change
+
+React to field value changes (form view):
+
+```javascript
+loom.on_change = function(fieldname, value, doc) {
+  if (fieldname === "quantity" || fieldname === "rate") {
+    doc.amount = (doc.quantity || 0) * (doc.rate || 0);
+  }
+};
+```
+
+### How Client Scripts Are Loaded
+
+Client scripts are stored in the `__customization` table and served as part of the DocType meta response (`GET /api/doctype/{name}`). The frontend evaluates them when the form or list view mounts.
+
+In developer mode, saving a `.client.js` file triggers an automatic reload into the database.
+
 ## Sandbox Limits
 
 Scripts run in a sandboxed environment:

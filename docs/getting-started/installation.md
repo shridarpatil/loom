@@ -29,14 +29,50 @@ alias loom="./target/release/loom_cli"
 createdb loom_dev
 
 # Initialize the site
-loom new-site mysite.localhost --db-url postgres://localhost/loom_dev
+loom new-site mysite.localhost --db-name loom_dev
 
 # Start the server
-loom serve --db-url postgres://localhost/loom_dev
+loom serve
 
 # Open http://localhost:8000
 # Login: Administrator / admin
 ```
+
+## site_config.json
+
+Each site has a `sites/{site_name}/site_config.json` that stores database credentials and site settings. Commands like `loom serve` and `loom migrate` read this automatically, so you don't need to pass `--db-url` every time.
+
+```json
+{
+  "db_name": "loom_dev",
+  "db_type": "postgres",
+  "db_host": "localhost",
+  "db_port": 5432,
+  "db_user": "loom",
+  "db_password": "loom",
+  "developer_mode": true
+}
+```
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `db_name` | `loom` | PostgreSQL database name |
+| `db_host` | `localhost` | Database host |
+| `db_port` | `5432` | Database port |
+| `db_user` | `postgres` | Database user |
+| `db_password` | `""` | Database password |
+| `developer_mode` | `false` | Enable file watching and hot-reload (see below) |
+
+### Developer Mode
+
+Set `"developer_mode": true` in site_config.json to enable:
+
+- **File watcher** — Automatically watches `apps/` and `core_doctypes/` for changes
+- **Hot-reload DocTypes** — Saving a `.json` file re-registers the DocType and runs migrations
+- **Hot-reload scripts** — Saving a `.rhai` file reloads it into the hook runner
+- **Hot-reload client scripts** — Saving a `.client.js` file updates the `__customization` table
+
+No server restart needed for any of these changes.
 
 ## Docker
 

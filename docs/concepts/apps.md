@@ -1,6 +1,6 @@
 # App System
 
-Apps are the primary way to extend Loom. An app is a directory (or git repo) containing JSON, scripts, and optionally WASM plugins.
+Apps are the primary way to extend Loom. An app is a directory (or git repo) containing JSON DocType definitions, Rhai scripts, and fixtures.
 
 **No Rust toolchain is required to develop or install apps.**
 
@@ -21,8 +21,7 @@ my_app/
 ├── hooks.toml                 # Scheduled tasks, doc events, queues
 ├── fixtures/                  # Seed data
 │   └── leave_type.json
-├── plugins/                   # Optional WASM plugins
-│   └── payroll_engine.wasm
+├── plugins/                   # Reserved for future WASM plugins
 └── frontend/                  # Optional frontend extensions
     └── src/
 ```
@@ -56,6 +55,14 @@ method = "scripts/on_employee_update.rhai"
 [queues]
 names = ["default", "long", "critical"]
 
+# Fixture declarations (for loom export-fixtures)
+[[fixtures]]
+doctype = "Role"
+
+[[fixtures]]
+doctype = "Leave Type"
+filters = { module = "HR" }
+
 # Plugin pages (custom frontend routes)
 [[pages]]
 route = "/app/org-chart"
@@ -84,7 +91,55 @@ loom --site mysite.localhost install-app my_app
 4. Loads `*.client.js` → stores in `__customization` table
 5. Runs auto-migration → creates/alters database tables
 6. Loads `fixtures/*.json` → inserts seed data
-7. Copies `plugins/*.wasm` → site plugin directory
+7. Builds frontend extensions if present
+
+## Client Scripts
+
+Client scripts add client-side behavior to DocTypes — custom buttons, validation, and field change handlers. Place a `.client.js` file next to the DocType JSON:
+
+```
+my_app/doctypes/todo/
+├── todo.json
+├── todo.rhai          # Server script
+└── todo.client.js     # Client script
+```
+
+### Example: todo.client.js
+
+```javascript
+// Validation — return an error string to block save
+loom.validate = function(doc) {
+  if (doc.due_date && new Date(doc.due_date) < new Date().setHours(0,0,0,0)) {
+    return "Due Date cannot be in the past";
+  }
+};
+
+// Custom button on the form view only
+loom.add_button("Mark Complete", function(doc) {
+  doc.status = "Completed";
+}, { variant: "primary", view: "form" });
+
+// Custom button on the list view only
+loom.add_button("Close Selected", function(selectedRows) {
+  if (!selectedRows || selectedRows.length === 0) {
+    alert("Select rows first");
+    return;
+  }
+  alert("Closing " + selectedRows.length + " todo(s)");
+}, { view: "list" });
+```
+
+See [Scripting > Client Scripts](scripting.md#client-scripts) for the full API reference.
+
+## Developer Mode
+
+When `developer_mode` is enabled in `site_config.json`, Loom watches `apps/` and `core_doctypes/` for file changes:
+
+- Saving a `.json` DocType file reloads and migrates it instantly
+- Saving a `.rhai` script reloads it into the hook runner
+- Saving a `.client.js` file updates the `__customization` table
+
+This means you can edit files in your editor and see changes immediately without restarting the server.
 
 ## Customizing 3rd Party Apps
 

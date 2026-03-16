@@ -41,7 +41,7 @@ fn main(params, loom) {
 
 Queues are just string names. Any name works — workers process jobs from their assigned queue.
 
-### Declaring Queues
+### Declaring Custom Queues
 
 Apps declare their queues in `hooks.toml`:
 
@@ -50,7 +50,7 @@ Apps declare their queues in `hooks.toml`:
 names = ["default", "long", "critical"]
 ```
 
-`loom serve` auto-spawns one worker per declared queue. The `default` queue is always present.
+`loom serve` reads `hooks.toml` from every installed app and auto-spawns one worker per declared queue. The `default` queue is always present even if not declared.
 
 ### Common Queue Strategy
 
@@ -69,7 +69,7 @@ Workers are spawned automatically for every queue declared in `hooks.toml`.
 
 ### Manual Workers
 
-Start additional workers for scaling:
+Start additional workers for scaling with `loom worker`:
 
 ```bash
 # One worker for the "long" queue
@@ -78,7 +78,10 @@ loom worker --queue long
 # Four concurrent workers for "critical"
 loom worker --queue critical --concurrency 4
 
-# Custom database
+# Specify site (reads db credentials from site_config.json)
+loom worker --site mysite.localhost --queue default
+
+# Or override with explicit db URL
 loom worker --queue default --db-url postgres://db-host/mysite
 ```
 
@@ -122,3 +125,28 @@ Cron format: `minute hour day month weekday`
 | `N,M` | N or M |
 
 The scheduler checks every minute and enqueues matching tasks on the `default` queue.
+
+## Fixture Export via hooks.toml
+
+Apps can declare which DocTypes should be exportable as fixtures in `hooks.toml`:
+
+```toml
+[[fixtures]]
+doctype = "Role"
+
+[[fixtures]]
+doctype = "Leave Type"
+filters = { module = "HR" }
+```
+
+Run `loom export-fixtures` to export all declared fixtures across all apps, or export a single DocType:
+
+```bash
+# Export all fixtures declared in hooks.toml
+loom export-fixtures --site mysite.localhost
+
+# Export a specific DocType with filters
+loom export-fixtures --doctype Role --filters '{"module":"HR"}'
+```
+
+Exported files are written to `apps/{app}/fixtures/{doctype}.json`.
