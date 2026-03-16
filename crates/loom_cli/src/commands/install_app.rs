@@ -14,9 +14,13 @@ pub struct InstallAppArgs {
     /// App name or path to the app directory
     pub app: String,
 
-    /// Database URL
+    /// Database URL (overrides site config)
     #[arg(long, env = "DATABASE_URL")]
     pub db_url: Option<String>,
+
+    /// Site name
+    #[arg(long)]
+    pub site: Option<String>,
 }
 
 /// App metadata from loom_app.toml
@@ -61,9 +65,7 @@ pub async fn run(args: InstallAppArgs) -> anyhow::Result<()> {
     );
 
     // 2. Connect to database
-    let db_url = args
-        .db_url
-        .unwrap_or_else(|| "postgres://localhost/loom".to_string());
+    let db_url = crate::site_config::resolve_db_url(args.db_url, args.site.as_deref());
     let pool = PgPoolOptions::new()
         .max_connections(5)
         .connect(&db_url)

@@ -172,7 +172,7 @@ pub async fn get_list(
         sql.push_str(&where_clauses.join(" AND "));
     }
 
-    let order = order_by.unwrap_or("modified DESC");
+    let order = sanitize_order_by(order_by.unwrap_or("modified DESC"));
     sql.push_str(&format!(" ORDER BY {}", order));
 
     if let Some(limit) = limit {
@@ -682,4 +682,36 @@ fn sql_cast_for_key(key: &str, meta: &Meta) -> &'static str {
         }
     }
     ""
+}
+
+/// Sanitize ORDER BY clause to prevent SQL injection.
+/// Only allows: fieldname, fieldname ASC/DESC, multiple comma-separated.
+fn sanitize_order_by(input: &str) -> String {
+    input
+        .split(',')
+        .map(|part| {
+            let part = part.trim();
+            let tokens: Vec<&str> = part.split_whitespace().collect();
+            match tokens.as_slice() {
+                [field] => {
+                    let f = sanitize_identifier(field);
+                    format!("\"{}\"", f)
+                }
+                [field, dir] => {
+                    let f = sanitize_identifier(field);
+                    let d = if dir.eq_ignore_ascii_case("asc") { "ASC" } else { "DESC" };
+                    format!("\"{}\" {}", f, d)
+                }
+                _ => "\"modified\" DESC".to_string(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// Strip non-alphanumeric/underscore chars from an identifier.
+fn sanitize_identifier(s: &str) -> String {
+    s.chars()
+        .filter(|c| c.is_alphanumeric() || *c == '_')
+        .collect()
 }

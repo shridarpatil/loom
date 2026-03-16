@@ -8,14 +8,16 @@ use crate::queue;
 /// Background job worker — polls a named queue and executes Rhai scripts.
 pub struct Worker {
     pool: Arc<PgPool>,
+    registry: Arc<loom_core::doctype::DocTypeRegistry>,
     queue_name: String,
     poll_interval: Duration,
 }
 
 impl Worker {
-    pub fn new(pool: Arc<PgPool>, queue_name: &str) -> Self {
+    pub fn new(pool: Arc<PgPool>, registry: Arc<loom_core::doctype::DocTypeRegistry>, queue_name: &str) -> Self {
         Self {
             pool,
+            registry,
             queue_name: queue_name.to_string(),
             poll_interval: Duration::from_secs(1),
         }
@@ -64,15 +66,13 @@ impl Worker {
             }
         };
 
-        let registry = Arc::new(loom_core::doctype::DocTypeRegistry::new());
-        let _ = registry.load_from_database(&self.pool).await;
-
+        // Use shared registry instead of creating a new one per job
         let mut engine = loom_core::script::create_engine();
         loom_core::script::api::register_loom_api(&mut engine);
         loom_core::script::register_db_api(
             &mut engine,
             self.pool.clone(),
-            registry,
+            self.registry.clone(),
             "Administrator".to_string(),
             vec!["Administrator".to_string(), "All".to_string()],
         );

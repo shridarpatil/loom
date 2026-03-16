@@ -88,7 +88,7 @@ pub async fn insert(
 
     // Log activity
     let doc_name = result.get("id").and_then(|v| v.as_str()).unwrap_or("");
-    let _ = activity::log_activity(
+    if let Err(e) = activity::log_activity(
         ctx.pool(),
         &meta.name,
         doc_name,
@@ -96,7 +96,7 @@ pub async fn insert(
         &ctx.user,
         &serde_json::json!({}),
     )
-    .await;
+    .await { tracing::warn!("Activity log failed: {}", e); }
 
     // Strip fields by read permlevel on response
     if !ctx.ignore_permissions() {
@@ -323,7 +323,7 @@ pub async fn update(
     hooks.run_hook(HookEvent::AfterSave, &meta.name, &mut result, ctx).await?;
 
     // Log activity with before/after values
-    let _ = activity::log_activity(
+    if let Err(e) = activity::log_activity(
         ctx.pool(),
         &meta.name,
         name,
@@ -331,7 +331,7 @@ pub async fn update(
         &ctx.user,
         &serde_json::json!({ "changed": changed_details }),
     )
-    .await;
+    .await { tracing::warn!("Activity log failed: {}", e); }
 
     // Strip fields by read permlevel on response
     if !ctx.ignore_permissions() {
@@ -435,7 +435,7 @@ pub async fn submit(
     hooks.run_hook(HookEvent::OnSubmit, &meta.name, &mut result, ctx).await?;
 
     // Log activity
-    let _ = activity::log_activity(
+    if let Err(e) = activity::log_activity(
         ctx.pool(),
         &meta.name,
         name,
@@ -443,7 +443,7 @@ pub async fn submit(
         &ctx.user,
         &serde_json::json!({}),
     )
-    .await;
+    .await { tracing::warn!("Activity log failed: {}", e); }
 
     // Strip fields by read permlevel on response
     if !ctx.ignore_permissions() {
@@ -520,7 +520,7 @@ pub async fn cancel(
     hooks.run_hook(HookEvent::OnCancel, &meta.name, &mut result, ctx).await?;
 
     // Log activity
-    let _ = activity::log_activity(
+    if let Err(e) = activity::log_activity(
         ctx.pool(),
         &meta.name,
         name,
@@ -528,7 +528,7 @@ pub async fn cancel(
         &ctx.user,
         &serde_json::json!({}),
     )
-    .await;
+    .await { tracing::warn!("Activity log failed: {}", e); }
 
     // Strip fields by read permlevel on response
     if !ctx.ignore_permissions() {

@@ -249,11 +249,10 @@ fn has_table_fields(meta: &Meta) -> bool {
 
 use super::meta::set_standard_fields_on_insert as set_standard_fields;
 
-fn generate_child_id(row: &mut Value, parent_name: &str, fieldname: &str) {
+fn generate_child_id(row: &mut Value, _parent_name: &str, _fieldname: &str) {
     if let Some(obj) = row.as_object_mut() {
         if obj.get("id").and_then(|v| v.as_str()).unwrap_or("").is_empty() {
-            let idx = obj.get("idx").and_then(|v| v.as_i64()).unwrap_or(0);
-            let id = format!("{}-{}-{}", parent_name, fieldname, idx);
+            let id = uuid::Uuid::new_v4().to_string().replace('-', "")[..10].to_string();
             obj.insert("id".to_string(), json!(id));
         }
     }

@@ -55,6 +55,7 @@ pub fn start_watcher(
         // Debounce: collect events for 500ms before processing
         let mut pending_json: Vec<std::path::PathBuf> = Vec::new();
         let mut pending_rhai: Vec<std::path::PathBuf> = Vec::new();
+        let mut pending_client_js: Vec<std::path::PathBuf> = Vec::new();
 
         loop {
             tokio::select! {
@@ -62,9 +63,12 @@ pub fn start_watcher(
                     match event.kind {
                         EventKind::Create(_) | EventKind::Modify(_) => {
                             for path in &event.paths {
-                                if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                                let path_str = path.to_string_lossy();
+                                if path_str.ends_with(".client.js") {
+                                    pending_client_js.push(path.clone());
+                                } else if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
                                     match ext {
-                                        "json" if !path.to_string_lossy().contains(".customize.") => {
+                                        "json" if !path_str.contains(".customize.") => {
                                             pending_json.push(path.clone());
                                         }
                                         "rhai" => {
@@ -78,13 +82,16 @@ pub fn start_watcher(
                         _ => {}
                     }
                 }
-                _ = tokio::time::sleep(Duration::from_millis(500)), if !pending_json.is_empty() || !pending_rhai.is_empty() => {
+                _ = tokio::time::sleep(Duration::from_millis(500)), if !pending_json.is_empty() || !pending_rhai.is_empty() || !pending_client_js.is_empty() => {
                     // Process pending changes
                     for path in pending_json.drain(..) {
                         reload_doctype(&pool, &registry, &path).await;
                     }
                     for path in pending_rhai.drain(..) {
                         reload_script(&hook_runner, &path).await;
+                    }
+                    for path in pending_client_js.drain(..) {
+                        reload_client_script(&pool, &path).await;
                     }
                 }
             }
@@ -150,4 +157,54 @@ async fn reload_script(hook_runner: &RhaiHookRunner, path: &Path) {
 
     hook_runner.load_script(&doctype, source).await;
     tracing::info!("[hot-reload] Reloaded script for '{}' from {:?}", doctype, path);
+}
+
+async fn reload_client_script(pool: &PgPool, path: &Path) {
+    let source = match std::fs::read_to_string(path) {
+        Ok(s) => s,
+        Err(e) => {
+            tracing::warn!("Failed to read client script {:?}: {}", path, e);
+            return;
+        }
+    };
+
+    // Extract DocType name from path: .../doctypes/todo/todo.client.js → "todo"
+    let filename = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
+    let slug = filename.strip_suffix(".client.js").unwrap_or("").to_string();
+    if slug.is_empty() {
+        return;
+    }
+
+    // Find the DocType name — try the slug as-is, or look up from the parent dir JSON
+    let doctype_name = if let Some(parent) = path.parent() {
+        let json_path = parent.join(format!("{}.json", slug));
+        if json_path.exists() {
+            if let Ok(content) = std::fs::read_to_string(&json_path) {
+                if let Ok(meta) = serde_json::from_str::<serde_json::Value>(&content) {
+                    meta.get("name").and_then(|v| v.as_str()).unwrap_or(&slug).to_string()
+                } else {
+                    slug.clone()
+                }
+            } else {
+                slug.clone()
+            }
+        } else {
+            slug.clone()
+        }
+    } else {
+        slug.clone()
+    };
+
+    // Upsert into __customization
+    let _ = sqlx::query(
+        "INSERT INTO \"__customization\" (doctype, overrides, client_script, modified) \
+         VALUES ($1, '{}', $2, NOW()) \
+         ON CONFLICT (doctype) DO UPDATE SET client_script = $2, modified = NOW()",
+    )
+    .bind(&doctype_name)
+    .bind(&source)
+    .execute(pool)
+    .await;
+
+    tracing::info!("[hot-reload] Reloaded client script for '{}' from {:?}", doctype_name, path);
 }

@@ -35,6 +35,11 @@ pub async fn run(args: WorkerArgs) -> anyhow::Result<()> {
 
     migrate_system_tables(&pool).await?;
 
+    // Load shared registry
+    let registry = std::sync::Arc::new(loom_core::doctype::DocTypeRegistry::new());
+    registry.register(loom_core::doctype::Meta::doctype_meta()).await;
+    let _ = registry.load_from_database(&pool).await;
+
     let pool = Arc::new(pool);
 
     tracing::info!(
@@ -45,7 +50,7 @@ pub async fn run(args: WorkerArgs) -> anyhow::Result<()> {
 
     let mut handles = Vec::new();
     for i in 0..args.concurrency {
-        let worker = Worker::new(pool.clone(), &args.queue);
+        let worker = Worker::new(pool.clone(), registry.clone(), &args.queue);
         let handle = tokio::spawn(async move {
             tracing::info!("Worker {}/{} started", i + 1, args.concurrency);
             worker.run().await;

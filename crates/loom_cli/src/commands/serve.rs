@@ -170,7 +170,7 @@ pub async fn run(args: ServeArgs) -> anyhow::Result<()> {
 
     // Start one worker per queue
     for queue_name in &queues {
-        let worker = Worker::new(Arc::new(pool.clone()), queue_name);
+        let worker = Worker::new(Arc::new(pool.clone()), registry.clone(), queue_name);
         tokio::spawn(async move { worker.run().await });
     }
     tracing::info!("Started workers for queues: {}", queues.join(", "));
