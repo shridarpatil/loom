@@ -4,7 +4,7 @@ use sqlx::PgPool;
 use super::meta::{FieldType, Meta, STANDARD_FIELDS};
 use crate::error::{LoomError, LoomResult};
 
-/// Insert a new document into the database.
+/// Insert a new document into the database using parameterized queries.
 pub async fn insert_doc(
     pool: &PgPool,
     meta: &Meta,
@@ -21,48 +21,42 @@ pub async fn insert_doc(
 
     let mut columns = Vec::new();
     let mut placeholders = Vec::new();
-    let mut values: Vec<String> = Vec::new();
+    let mut bind_values: Vec<String> = Vec::new();
     let mut idx = 1;
 
     for (key, value) in obj {
-        // Only insert fields that exist as standard fields or in the meta
         let is_standard = STANDARD_FIELDS.iter().any(|(name, _)| *name == key.as_str());
         let is_meta_field = meta.get_field(key).is_some_and(|f| f.fieldtype.has_column());
 
         if is_standard || is_meta_field {
+            let cast = sql_cast_for_key(key, meta);
             columns.push(format!("\"{}\"", key));
-            placeholders.push(format!("${}", idx));
-            values.push(value_to_sql_string(value));
+            placeholders.push(format!("${}{}", idx, cast));
+            bind_values.push(value_to_sql_string(value));
             idx += 1;
         }
     }
 
+    if columns.is_empty() {
+        return Err(LoomError::Validation("No valid fields to insert".to_string()));
+    }
+
     let sql = format!(
-        "INSERT INTO \"{}\" ({}) VALUES ({}) RETURNING *",
+        "INSERT INTO \"{}\" ({}) VALUES ({}) RETURNING row_to_json(\"{}\".*)",
         table,
         columns.join(", "),
-        placeholders.join(", ")
+        placeholders.join(", "),
+        table
     );
 
     tracing::debug!("INSERT SQL: {}", sql);
 
-    // For now, use a simple text-based query approach.
-    // In production, this would use proper parameterized queries with sqlx::query_as.
-    let row = sqlx::query_scalar::<_, Value>(&format!(
-        "INSERT INTO \"{}\" ({}) VALUES ({}) RETURNING row_to_json(\"{}\".*)",
-        table,
-        columns.join(", "),
-        // Build actual value literals for now — will be replaced with proper bind params
-        values
-            .iter()
-            .map(|v| format!("'{}'", v.replace('\'', "''")))
-            .collect::<Vec<_>>()
-            .join(", "),
-        table
-    ))
-    .fetch_one(pool)
-    .await?;
+    let mut query = sqlx::query_scalar::<_, Value>(&sql);
+    for val in &bind_values {
+        query = query.bind(val);
+    }
 
+    let row = query.fetch_one(pool).await?;
     Ok(row)
 }
 
@@ -660,6 +654,11 @@ pub async fn validate_link_fields(pool: &PgPool, meta: &Meta, doc: &Value) -> Lo
 }
 
 /// Return a SQL cast suffix for bind params that need type coercion.
+/// Public alias for use by child.rs and other modules.
+pub fn sql_cast_for_key_with_meta(key: &str, meta: &Meta) -> &'static str {
+    sql_cast_for_key(key, meta)
+}
+
 fn sql_cast_for_key(key: &str, meta: &Meta) -> &'static str {
     // Standard timestamp fields
     match key {

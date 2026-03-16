@@ -258,7 +258,7 @@ fn generate_child_id(row: &mut Value, _parent_name: &str, _fieldname: &str) {
     }
 }
 
-/// Insert a single child row into its table.
+/// Insert a single child row into its table using parameterized queries.
 async fn insert_child_row(
     pool: &PgPool,
     table: &str,
@@ -270,7 +270,9 @@ async fn insert_child_row(
         .ok_or_else(|| LoomError::Validation("Child row must be a JSON object".into()))?;
 
     let mut columns = Vec::new();
-    let mut values: Vec<String> = Vec::new();
+    let mut placeholders = Vec::new();
+    let mut bind_values: Vec<String> = Vec::new();
+    let mut idx = 1;
 
     for (key, value) in obj {
         // Skip Table fields — they're handled by recursion, not stored as columns
@@ -288,14 +290,17 @@ async fn insert_child_row(
             .is_some_and(|f| f.fieldtype.has_column());
 
         if is_standard || is_meta_field {
+            let cast = crate::doctype::crud::sql_cast_for_key_with_meta(key, child_meta);
             columns.push(format!("\"{}\"", key));
-            values.push(match value {
+            placeholders.push(format!("${}{}", idx, cast));
+            bind_values.push(match value {
                 Value::String(s) => s.clone(),
                 Value::Number(n) => n.to_string(),
                 Value::Bool(b) => b.to_string(),
-                Value::Null => "NULL".to_string(),
+                Value::Null => String::new(),
                 _ => value.to_string(),
             });
+            idx += 1;
         }
     }
 
@@ -307,14 +312,15 @@ async fn insert_child_row(
         "INSERT INTO \"{}\" ({}) VALUES ({})",
         table,
         columns.join(", "),
-        values
-            .iter()
-            .map(|v| format!("'{}'", v.replace('\'', "''")))
-            .collect::<Vec<_>>()
-            .join(", ")
+        placeholders.join(", "),
     );
 
-    sqlx::query(&sql)
+    let mut query = sqlx::query(&sql);
+    for val in &bind_values {
+        query = query.bind(val);
+    }
+
+    query
         .execute(pool)
         .await
         .map_err(|e| LoomError::Internal(format!("Failed to insert child row: {}", e)))?;
