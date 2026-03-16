@@ -1,0 +1,80 @@
+{
+  "name": "User",
+  "module": "Core",
+  "naming_rule": "prompt",
+  "title_field": "full_name",
+  "search_fields": ["full_name", "email"],
+  "sort_field": "creation",
+  "sort_order": "desc",
+  "fields": [
+    {
+      "fieldname": "email",
+      "label": "Email",
+      "fieldtype": "Data",
+      "reqd": true,
+      "unique": true,
+      "in_list_view": true,
+      "in_standard_filter": true
+    },
+    {
+      "fieldname": "full_name",
+      "label": "Full Name",
+      "fieldtype": "Data",
+      "in_list_view": true
+    },
+    {
+      "fieldname": "enabled",
+      "label": "Enabled",
+      "fieldtype": "Check",
+      "default": true,
+      "in_list_view": true,
+      "in_standard_filter": true
+    },
+    {
+      "fieldname": "sb_password",
+      "fieldtype": "SectionBreak",
+      "label": "Password"
+    },
+    {
+      "fieldname": "password_hash",
+      "label": "Password Hash",
+      "fieldtype": "Password",
+      "hidden": true
+    },
+    {
+      "fieldname": "new_password",
+      "label": "New Password",
+      "fieldtype": "Password",
+      "description": "Set a new password. Leave blank to keep existing."
+    },
+    {
+      "fieldname": "sb_roles",
+      "fieldtype": "SectionBreak",
+      "label": "Roles"
+    },
+    {
+      "fieldname": "roles_json",
+      "label": "Roles",
+      "fieldtype": "JSON",
+      "default": "[\"All\"]",
+      "description": "JSON array of role names"
+    }
+  ],
+  "permissions": [
+    {
+      "role": "Administrator",
+      "permlevel": 0,
+      "read": true,
+      "write": true,
+      "create": true,
+      "delete": true
+    },
+    {
+      "role": "System Manager",
+      "permlevel": 0,
+      "read": true,
+      "write": true,
+      "create": true
+    }
+  ]
+}

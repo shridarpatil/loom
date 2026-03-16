@@ -1,0 +1,53 @@
+{
+  "name": "Role",
+  "module": "Core",
+  "naming_rule": "prompt",
+  "sort_field": "creation",
+  "sort_order": "asc",
+  "fields": [
+    {
+      "fieldname": "role_name",
+      "label": "Role Name",
+      "fieldtype": "Data",
+      "reqd": true,
+      "in_list_view": true
+    },
+    {
+      "fieldname": "module",
+      "label": "Module",
+      "fieldtype": "Data",
+      "in_list_view": true,
+      "in_standard_filter": true,
+      "description": "The app module this role belongs to. Used for fixture export."
+    },
+    {
+      "fieldname": "description",
+      "label": "Description",
+      "fieldtype": "Text"
+    },
+    {
+      "fieldname": "is_custom",
+      "label": "Is Custom",
+      "fieldtype": "Check",
+      "default": true,
+      "description": "Custom roles can be deleted. System roles cannot."
+    }
+  ],
+  "permissions": [
+    {
+      "role": "Administrator",
+      "permlevel": 0,
+      "read": true,
+      "write": true,
+      "create": true,
+      "delete": true
+    },
+    {
+      "role": "System Manager",
+      "permlevel": 0,
+      "read": true,
+      "write": true,
+      "create": true
+    }
+  ]
+}

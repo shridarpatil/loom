@@ -1,0 +1,35 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: loom-postgres
+    environment:
+      POSTGRES_USER: loom
+      POSTGRES_PASSWORD: loom
+      POSTGRES_DB: mysite_localhost
+    ports:
+      - "5432:5432"
+    volumes:
+      - loom_pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: loom-redis
+    ports:
+      - "6379:6379"
+
+  loom:
+    build: .
+    container_name: loom-server
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      DATABASE_URL: postgres://loom:loom@postgres/mysite_localhost
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./apps:/opt/loom/apps
+      - ./sites:/opt/loom/sites
+
+volumes:
+  loom_pgdata:

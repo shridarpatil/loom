@@ -1,0 +1,32 @@
+# Build
+/target
+**/*.rs.bk
+
+# Frontend
+/frontend/node_modules
+/frontend/dist
+
+# Sites (per-site data, not framework)
+sites/*/site_config.json
+sites/uploads/
+
+# Apps (user-installed, not framework)
+/apps/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+
+# Environment
+.env
+
+# Docs build
+/docs/_site
+/_site
+
+# OS
+.DS_Store
+Thumbs.db

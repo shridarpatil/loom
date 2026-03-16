@@ -1,0 +1,21 @@
+[package]
+name = "loom_core"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+tokio.workspace = true
+sqlx.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+rhai.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+rand.workspace = true
+sha2.workspace = true
+regex.workspace = true
+async-trait.workspace = true

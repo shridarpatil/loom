@@ -1,0 +1,77 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/loom_core",
+    "crates/loom_api",
+    "crates/loom_queue",
+    "crates/loom_print",
+    "crates/loom_cli",
+]
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.75"
+license = "MIT"
+
+[workspace.dependencies]
+# Async
+tokio = { version = "1", features = ["full"] }
+
+# Web framework
+axum = { version = "0.7", features = ["ws", "multipart"] }
+axum-extra = { version = "0.9", features = ["cookie", "typed-header"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace", "fs"] }
+
+# Database
+sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "postgres", "sqlite", "json", "chrono", "uuid"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+
+# Scripting
+rhai = { version = "1", features = ["sync", "serde"] }
+
+# WASM
+wasmtime = "27"
+
+# Templating
+minijinja = { version = "2", features = ["loader"] }
+
+# Error handling
+thiserror = "2"
+anyhow = "1"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# Redis
+fred = { version = "9", features = ["subscriber-client"] }
+
+# Email
+lettre = { version = "0.11", default-features = false, features = ["tokio1-rustls-tls", "builder", "hostname"] }
+
+# REPL
+rustyline = "15"
+
+# Utilities
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+rand = "0.8"
+sha2 = "0.10"
+regex = "1"
+async-trait = "0.1"
+futures-util = "0.3"
+notify = { version = "7", features = ["macos_fsevent"] }
+
+# Internal crates
+loom_core = { path = "crates/loom_core" }
+loom_api = { path = "crates/loom_api" }
+loom_queue = { path = "crates/loom_queue" }
+loom_print = { path = "crates/loom_print" }
