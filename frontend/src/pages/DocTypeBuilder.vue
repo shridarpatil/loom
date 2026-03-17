@@ -34,6 +34,7 @@ interface BuilderField {
 interface BuilderSection {
   label: string;
   collapsible: boolean;
+  isTab: boolean;
   columns: number; // 1, 2, or 3
   fields: BuilderField[][]; // fields[colIdx] = fields in that column
 }
@@ -47,7 +48,7 @@ const autoname = ref("");
 const isSubmittable = ref(false);
 const isChildTable = ref(false);
 const sections = ref<BuilderSection[]>([
-  { label: "", collapsible: false, columns: 1, fields: [[]] },
+  { label: "", collapsible: false, isTab: false, columns: 1, fields: [[]] },
 ]);
 const permissions = ref<DocPermMeta[]>([
   { role: "Administrator", permlevel: 0, read: true, write: true, create: true, delete: true, submit: false, cancel: false },
@@ -69,12 +70,12 @@ const availableRoles = ["Administrator", "System Manager", "All", "Guest"];
 // --- Parse flat fields into sections ---
 function parseSections(flatFields: DocFieldMeta[]): BuilderSection[] {
   const result: BuilderSection[] = [];
-  let current: BuilderSection = { label: "", collapsible: false, columns: 1, fields: [[]] };
+  let current: BuilderSection = { label: "", collapsible: false, isTab: false, columns: 1, fields: [[]] };
   result.push(current);
 
   for (const f of flatFields) {
     if (f.fieldtype === "SectionBreak" || f.fieldtype === "TabBreak") {
-      current = { label: f.label || "", collapsible: f.collapsible || false, columns: 1, fields: [[]] };
+      current = { label: f.label || "", collapsible: f.collapsible || false, isTab: f.fieldtype === "TabBreak", columns: 1, fields: [[]] };
       result.push(current);
     } else if (f.fieldtype === "ColumnBreak") {
       current.columns++;
@@ -105,7 +106,7 @@ function parseSections(flatFields: DocFieldMeta[]): BuilderSection[] {
     result.shift();
   }
 
-  return result.length > 0 ? result : [{ label: "", collapsible: false, columns: 1, fields: [[]] }];
+  return result.length > 0 ? result : [{ label: "", collapsible: false, isTab: false, columns: 1, fields: [[]] }];
 }
 
 // --- Flatten sections back to flat fields ---
@@ -115,13 +116,13 @@ function flattenToFields(): DocFieldMeta[] {
   for (let si = 0; si < sections.value.length; si++) {
     const section = sections.value[si];
 
-    // Add SectionBreak (skip for first section with no label)
+    // Add SectionBreak or TabBreak (skip for first section with no label)
     if (si > 0 || section.label) {
       flat.push({
-        fieldname: `sb_${si}`,
+        fieldname: section.isTab ? `tab_${si}` : `sb_${si}`,
         label: section.label,
-        fieldtype: "SectionBreak",
-        collapsible: section.collapsible,
+        fieldtype: section.isTab ? "TabBreak" : "SectionBreak",
+        collapsible: section.isTab ? false : section.collapsible,
       } as DocFieldMeta);
     }
 
@@ -223,7 +224,11 @@ const autonameLabel = computed(() => {
 
 // --- Section operations ---
 function addSection() {
-  sections.value.push({ label: "", collapsible: false, columns: 1, fields: [[]] });
+  sections.value.push({ label: "", collapsible: false, isTab: false, columns: 1, fields: [[]] });
+}
+
+function addTab() {
+  sections.value.push({ label: "New Tab", collapsible: false, isTab: true, columns: 1, fields: [[]] });
 }
 
 function removeSection(si: number) {
@@ -579,20 +584,38 @@ function removePermission(index: number) {
                 Fields
                 <span v-if="totalFieldCount > 0" class="text-text-light font-normal">({{ totalFieldCount }})</span>
               </h3>
-              <LButton variant="secondary" size="sm" @click="addSection">
-                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-                Add Section
-              </LButton>
+              <div class="flex gap-1.5">
+                <LButton variant="secondary" size="sm" @click="addTab">
+                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z" /></svg>
+                  Add Tab
+                </LButton>
+                <LButton variant="secondary" size="sm" @click="addSection">
+                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                  Add Section
+                </LButton>
+              </div>
             </div>
 
             <!-- Each section -->
             <div
               v-for="(section, si) in sections"
               :key="si"
-              class="bg-surface border border-border rounded-xl overflow-hidden"
+              :class="[
+                'bg-surface border rounded-xl overflow-hidden',
+                section.isTab ? 'border-primary-200' : 'border-border',
+              ]"
             >
               <!-- Section header -->
-              <div class="px-4 py-2.5 border-b border-border bg-surface-muted/30 flex items-center gap-2">
+              <div :class="[
+                'px-4 py-2.5 border-b flex items-center gap-2',
+                section.isTab ? 'border-primary-200 bg-primary-50/30' : 'border-border bg-surface-muted/30',
+              ]">
+                <!-- Type badge -->
+                <span :class="[
+                  'text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0',
+                  section.isTab ? 'bg-primary-100 text-primary-600' : 'bg-surface-raised text-text-light',
+                ]">{{ section.isTab ? 'Tab' : 'Section' }}</span>
+
                 <!-- Reorder -->
                 <div class="flex gap-0.5 shrink-0">
                   <button class="p-0.5 text-text-light hover:text-text rounded disabled:opacity-20" :disabled="si === 0" @click="moveSectionUp(si)" title="Move up">
@@ -603,11 +626,11 @@ function removePermission(index: number) {
                   </button>
                 </div>
 
-                <!-- Section label -->
+                <!-- Section/Tab label -->
                 <input
                   v-model="section.label"
                   type="text"
-                  placeholder="Section label (optional)"
+                  :placeholder="section.isTab ? 'Tab label (required)' : 'Section label (optional)'"
                   class="flex-1 min-w-0 px-2 py-1 text-[12px] font-semibold text-text-muted bg-transparent border-0 focus:outline-none focus:ring-0 placeholder-text-light"
                 />
 
