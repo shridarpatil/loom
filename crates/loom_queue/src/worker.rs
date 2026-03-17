@@ -5,12 +5,17 @@ use sqlx::PgPool;
 
 use crate::queue;
 
-/// Background job worker — polls a named queue and executes Rhai scripts.
+/// Maximum backoff interval when queue is idle (30 seconds).
+const MAX_BACKOFF: Duration = Duration::from_secs(30);
+/// Base poll interval.
+const BASE_INTERVAL: Duration = Duration::from_secs(1);
+
+/// Background job worker — uses LISTEN/NOTIFY to wake instantly when jobs arrive,
+/// with exponential backoff as fallback for reliability.
 pub struct Worker {
     pool: Arc<PgPool>,
     registry: Arc<loom_core::doctype::DocTypeRegistry>,
     queue_name: String,
-    poll_interval: Duration,
 }
 
 impl Worker {
@@ -23,33 +28,143 @@ impl Worker {
             pool,
             registry,
             queue_name: queue_name.to_string(),
-            poll_interval: Duration::from_secs(1),
         }
     }
 
     /// Start the worker loop. Runs until the task is cancelled.
+    ///
+    /// Uses PostgreSQL LISTEN/NOTIFY for instant wakeup when jobs are enqueued.
+    /// Falls back to exponential backoff polling if LISTEN fails.
     pub async fn run(&self) {
         tracing::info!("Worker for queue '{}' started", self.queue_name);
 
+        // Try to set up LISTEN on a dedicated connection
+        let channel = format!("loom_queue_{}", self.queue_name);
+        let mut listener = self.setup_listener(&channel).await;
+
+        if listener.is_some() {
+            tracing::info!(
+                "[{}] Using LISTEN/NOTIFY for job notifications",
+                self.queue_name
+            );
+        } else {
+            tracing::warn!(
+                "[{}] LISTEN/NOTIFY unavailable, falling back to polling",
+                self.queue_name
+            );
+        }
+
+        let mut backoff = BASE_INTERVAL;
+
         loop {
-            match queue::dequeue(&self.pool, &self.queue_name).await {
-                Ok(Some(job)) => {
-                    tracing::info!(
-                        "[{}] Processing job {} — {} (priority {})",
-                        self.queue_name,
-                        job.id,
-                        job.method,
-                        job.priority
-                    );
-                    self.execute_job(&job).await;
+            // First, drain all available jobs before sleeping
+            loop {
+                match self.try_dequeue_and_execute().await {
+                    Ok(true) => {
+                        // Job found and processed — reset backoff, check for more
+                        backoff = BASE_INTERVAL;
+                        continue;
+                    }
+                    Ok(false) => {
+                        // No jobs available — break to sleep
+                        break;
+                    }
+                    Err(e) => {
+                        tracing::error!("[{}] Dequeue error: {}", self.queue_name, e);
+                        break;
+                    }
                 }
-                Ok(None) => {
-                    tokio::time::sleep(self.poll_interval).await;
+            }
+
+            // Wait for notification or backoff timeout
+            if let Some(ref mut listener) = listener {
+                // Use LISTEN with a timeout — so we still periodically check even if
+                // a notification is missed (belt and suspenders)
+                let timeout = backoff.min(MAX_BACKOFF);
+                match tokio::time::timeout(timeout, listener.recv()).await {
+                    Ok(Ok(_notification)) => {
+                        // Notified — job available, reset backoff
+                        backoff = BASE_INTERVAL;
+                    }
+                    Ok(Err(e)) => {
+                        // Listener error — fall back to polling
+                        tracing::warn!(
+                            "[{}] LISTEN error: {}, falling back to polling",
+                            self.queue_name,
+                            e
+                        );
+                        tokio::time::sleep(backoff).await;
+                        backoff = (backoff * 2).min(MAX_BACKOFF);
+                    }
+                    Err(_timeout) => {
+                        // Timeout — do a lightweight check before heavy dequeue
+                        match queue::has_queued_jobs(&self.pool, &self.queue_name).await {
+                            Ok(true) => {
+                                backoff = BASE_INTERVAL;
+                            }
+                            Ok(false) => {
+                                backoff = (backoff * 2).min(MAX_BACKOFF);
+                            }
+                            Err(_) => {
+                                backoff = (backoff * 2).min(MAX_BACKOFF);
+                            }
+                        }
+                    }
                 }
-                Err(e) => {
-                    tracing::error!("[{}] Dequeue error: {}", self.queue_name, e);
-                    tokio::time::sleep(self.poll_interval).await;
+            } else {
+                // No listener — pure polling with exponential backoff
+                tokio::time::sleep(backoff).await;
+
+                // Lightweight check before expensive dequeue
+                match queue::has_queued_jobs(&self.pool, &self.queue_name).await {
+                    Ok(true) => {
+                        backoff = BASE_INTERVAL;
+                    }
+                    Ok(false) => {
+                        backoff = (backoff * 2).min(MAX_BACKOFF);
+                    }
+                    Err(_) => {
+                        backoff = (backoff * 2).min(MAX_BACKOFF);
+                    }
                 }
+            }
+        }
+    }
+
+    /// Try to dequeue and execute one job. Returns Ok(true) if a job was processed.
+    async fn try_dequeue_and_execute(&self) -> Result<bool, crate::error::QueueError> {
+        match queue::dequeue(&self.pool, &self.queue_name).await? {
+            Some(job) => {
+                tracing::info!(
+                    "[{}] Processing job {} — {} (priority {})",
+                    self.queue_name,
+                    job.id,
+                    job.method,
+                    job.priority
+                );
+                self.execute_job(&job).await;
+                Ok(true)
+            }
+            None => Ok(false),
+        }
+    }
+
+    /// Set up a PostgreSQL LISTEN on a dedicated connection.
+    /// Returns None if the connection cannot be established.
+    async fn setup_listener(&self, channel: &str) -> Option<sqlx::postgres::PgListener> {
+        // PgListener gets its own connection (not from the pool)
+        match sqlx::postgres::PgListener::connect_with(&*self.pool).await {
+            Ok(mut listener) => {
+                if listener.listen(channel).await.is_ok() {
+                    Some(listener)
+                } else {
+                    tracing::warn!("Failed to LISTEN on channel '{}'", channel);
+                    None
+                }
+            }
+            Err(e) => {
+                tracing::warn!("Failed to create PgListener: {}", e);
+                None
             }
         }
     }

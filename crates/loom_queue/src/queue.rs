@@ -38,6 +38,7 @@ pub struct EnqueueOptions {
 }
 
 /// Enqueue a job for background execution.
+/// Sends a PostgreSQL NOTIFY so workers wake up immediately.
 pub async fn enqueue(
     pool: &PgPool,
     method: &str,
@@ -61,6 +62,11 @@ pub async fn enqueue(
     .await
     .map_err(|e| QueueError::Internal(format!("Failed to enqueue: {}", e)))?;
 
+    // Wake up workers listening on this queue channel
+    let channel = format!("loom_queue_{}", queue);
+    let notify_sql = format!("NOTIFY \"{}\", '{}'", channel, id);
+    sqlx::query(&notify_sql).execute(pool).await.ok();
+
     tracing::info!(
         "Enqueued job {} for '{}' on queue '{}' (priority {})",
         id,
@@ -69,6 +75,19 @@ pub async fn enqueue(
         priority
     );
     Ok(id)
+}
+
+/// Lightweight check: are there any queued jobs on this queue?
+/// Much cheaper than the full UPDATE+subquery dequeue — avoids locking.
+pub async fn has_queued_jobs(pool: &PgPool, queue_name: &str) -> QueueResult<bool> {
+    let exists: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM \"__job_queue\" WHERE status = 'queued' AND queue = $1 LIMIT 1)",
+    )
+    .bind(queue_name)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| QueueError::Internal(format!("Failed to check queue: {}", e)))?;
+    Ok(exists)
 }
 
 /// Atomically fetch the next queued job from a specific queue, ordered by priority (desc) then id (asc).
@@ -115,7 +134,7 @@ pub async fn mark_completed(pool: &PgPool, job_id: i64) -> QueueResult<()> {
     Ok(())
 }
 
-/// Mark a job as failed. Re-queues if retries remain.
+/// Mark a job as failed. Re-queues if retries remain and sends NOTIFY to wake workers.
 pub async fn mark_failed(
     pool: &PgPool,
     job_id: i64,
@@ -132,5 +151,23 @@ pub async fn mark_failed(
     .execute(pool)
     .await
     .map_err(|e| QueueError::Internal(e.to_string()))?;
+
+    // If re-queued for retry, notify workers
+    if can_retry {
+        // We don't know the queue name here, so fetch it
+        let queue_name: Option<String> =
+            sqlx::query_scalar("SELECT queue FROM \"__job_queue\" WHERE id = $1")
+                .bind(job_id)
+                .fetch_optional(pool)
+                .await
+                .ok()
+                .flatten();
+        if let Some(q) = queue_name {
+            let channel = format!("loom_queue_{}", q);
+            let notify_sql = format!("NOTIFY \"{}\", '{}'", channel, job_id);
+            sqlx::query(&notify_sql).execute(pool).await.ok();
+        }
+    }
+
     Ok(())
 }
