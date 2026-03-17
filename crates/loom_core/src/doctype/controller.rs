@@ -83,7 +83,8 @@ pub async fn insert(
     // DB insert
     let result = crud::insert_doc(ctx.pool(), meta, doc, &ctx.user).await?;
 
-    // Insert child table rows
+    // Insert child table rows (use original doc which has the child arrays,
+    // not result which is the DB row without Table field columns)
     let mut result = result;
     let parent_name = result
         .get("id")
@@ -94,7 +95,7 @@ pub async fn insert(
         ctx.pool(),
         meta,
         &parent_name,
-        &mut result,
+        doc,
         &ctx.user,
         &ctx.registry,
     )
