@@ -28,7 +28,7 @@ pub async fn get_meta(
     })?;
 
     // Merge site-level customizations (hidden fields, property changes, client scripts)
-    apply_customization(&state.pool, &name, &mut meta_json).await;
+    apply_customization(&state.pool, &name, &mut meta_json, Some(&state.cache)).await;
 
     Ok(Json(json!({ "data": meta_json })))
 }

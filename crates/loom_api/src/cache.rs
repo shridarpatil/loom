@@ -67,9 +67,9 @@ pub type CachedMeta = loom_core::doctype::Meta;
 impl AppCache {
     pub fn new() -> Self {
         Self {
-            sessions: TtlCache::new(300),        // 5 min
-            customizations: TtlCache::new(300),   // 5 min
-            user_permissions: TtlCache::new(300),  // 5 min
+            sessions: TtlCache::new(3600),         // 1 hour — invalidated on logout
+            customizations: TtlCache::new(86400),   // 24 hours — invalidated on save
+            user_permissions: TtlCache::new(3600),   // 1 hour — invalidated on role change
         }
     }
 

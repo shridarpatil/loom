@@ -222,17 +222,47 @@ pub async fn export_customization(
 }
 
 /// Apply customization overrides to a Meta JSON value.
-pub async fn apply_customization(pool: &sqlx::PgPool, doctype: &str, meta: &mut Value) {
-    let row: Option<(Value, String)> = sqlx::query_as(
-        "SELECT overrides, COALESCE(client_script, '') FROM \"__customization\" WHERE doctype = $1",
-    )
-    .bind(doctype)
-    .fetch_optional(pool)
-    .await
-    .unwrap_or(None);
+/// Uses cache if provided to avoid DB hit on every request.
+pub async fn apply_customization(pool: &sqlx::PgPool, doctype: &str, meta: &mut Value, cache: Option<&crate::cache::AppCache>) {
+    // Try cache first
+    let cached = if let Some(c) = cache {
+        c.customizations.get(doctype).await
+    } else {
+        None
+    };
 
-    let Some((overrides, client_script)) = row else {
-        return;
+    let (overrides, client_script) = if let Some(Some(cached_val)) = cached {
+        // Cache hit — extract overrides and client_script
+        let cs = cached_val.get("__client_script").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        (cached_val, cs)
+    } else {
+        // Cache miss or no cache — query DB
+        let row: Option<(Value, String)> = sqlx::query_as(
+            "SELECT overrides, COALESCE(client_script, '') FROM \"__customization\" WHERE doctype = $1",
+        )
+        .bind(doctype)
+        .fetch_optional(pool)
+        .await
+        .unwrap_or(None);
+
+        let Some((overrides, client_script)) = row else {
+            // Store negative cache
+            if let Some(c) = cache {
+                c.customizations.set(doctype.to_string(), None).await;
+            }
+            return;
+        };
+
+        // Store in cache (embed client_script in the overrides for caching)
+        if let Some(c) = cache {
+            let mut cache_val = overrides.clone();
+            if let Some(obj) = cache_val.as_object_mut() {
+                obj.insert("__client_script".to_string(), json!(client_script));
+            }
+            c.customizations.set(doctype.to_string(), Some(cache_val)).await;
+        }
+
+        (overrides, client_script)
     };
 
     if let Some(field_overrides) = overrides.as_object() {

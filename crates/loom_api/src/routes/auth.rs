@@ -97,6 +97,8 @@ pub async fn logout(
                 .execute(&state.pool)
                 .await
                 .ok();
+            // Invalidate session cache
+            state.cache.invalidate_session(&sid).await;
         }
     }
 
