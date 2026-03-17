@@ -47,7 +47,7 @@ const router = createRouter({
         {
           path: ":doctype",
           name: "list",
-          component: () => import("@/pages/ListView.vue"),
+          component: () => import("@/pages/RouteResolver.vue"),
           props: true,
         },
         {

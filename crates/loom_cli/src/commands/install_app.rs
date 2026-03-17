@@ -40,6 +40,10 @@ struct AppMeta {
     #[serde(default)]
     description: Option<String>,
     #[serde(default)]
+    icon: Option<String>,
+    #[serde(default)]
+    color: Option<String>,
+    #[serde(default)]
     modules: Vec<String>,
 }
 
@@ -123,6 +127,63 @@ pub async fn run(args: InstallAppArgs) -> anyhow::Result<()> {
             tracing::info!("Loaded {} fixture record(s)", fixture_count);
         }
     }
+
+    // 10. Save app metadata to __site_config for the home page
+    // Read workspace items from hooks.toml
+    let hooks_path = app_path.join("hooks.toml");
+    let workspace_items: Vec<serde_json::Value> = if hooks_path.exists() {
+        if let Ok(content) = std::fs::read_to_string(&hooks_path) {
+            if let Ok(hooks) = content.parse::<toml::Value>() {
+                hooks.get("workspace")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| arr.iter().filter_map(|item| {
+                        let table = item.as_table()?;
+                        Some(serde_json::json!({
+                            "label": table.get("label").and_then(|v| v.as_str()).unwrap_or(""),
+                            "route": table.get("route").and_then(|v| v.as_str()).unwrap_or(""),
+                            "icon": table.get("icon").and_then(|v| v.as_str()).unwrap_or("grid"),
+                        }))
+                    }).collect())
+                    .unwrap_or_default()
+            } else { vec![] }
+        } else { vec![] }
+    } else { vec![] };
+
+    let app_info = serde_json::json!({
+        "name": config.app.name,
+        "title": config.app.title.as_deref().unwrap_or(&config.app.name),
+        "icon": config.app.icon,
+        "color": config.app.color,
+        "modules": config.app.modules,
+        "workspace": workspace_items,
+    });
+
+    // Read existing installed_apps, append this one
+    let existing: serde_json::Value = sqlx::query_scalar(
+        "SELECT value FROM \"__site_config\" WHERE key = 'installed_apps'",
+    )
+    .fetch_optional(&pool)
+    .await
+    .ok()
+    .flatten()
+    .unwrap_or(serde_json::json!([]));
+
+    let mut apps = match existing.as_array() {
+        Some(arr) => arr.clone(),
+        None => vec![],
+    };
+
+    // Remove old entry for this app (re-install case)
+    apps.retain(|a| a.get("name").and_then(|v| v.as_str()) != Some(&config.app.name));
+    apps.push(app_info);
+
+    sqlx::query(
+        "INSERT INTO \"__site_config\" (key, value, modified) VALUES ('installed_apps', $1, NOW()) \
+         ON CONFLICT (key) DO UPDATE SET value = $1, modified = NOW()",
+    )
+    .bind(&serde_json::json!(apps))
+    .execute(&pool)
+    .await?;
 
     tracing::info!("App '{}' installed successfully!", config.app.name);
     Ok(())

@@ -207,14 +207,14 @@ async fn lookup_user(
     if let Some((id, _email_col, full_name, password_hash, roles_json)) = row {
         let password_hash = password_hash.unwrap_or_default();
         let full_name = full_name.unwrap_or_default();
-        let enabled_sql = format!("SELECT enabled FROM \"{}\" WHERE id = $1", user_table);
+        let enabled_sql = format!("SELECT enabled::TEXT FROM \"{}\" WHERE id = $1", user_table);
         let enabled_val: Option<String> = sqlx::query_scalar(&enabled_sql)
             .bind(&id)
             .fetch_optional(pool)
             .await
             .ok()
             .flatten();
-        let enabled = matches!(enabled_val.as_deref(), Some("true") | Some("t") | Some("1"));
+        let enabled = matches!(enabled_val.as_deref(), Some("true") | Some("t") | Some("1") | Some("yes"));
 
         let roles = roles_json.unwrap_or(json!(["All"]));
         // roles_json might be stored as a JSON string inside a text column

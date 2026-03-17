@@ -356,6 +356,47 @@ pub async fn seed_admin_to_doctype_table(pool: &PgPool) -> LoomResult<()> {
         tracing::info!("Seeded default roles into {}", role_table);
     }
 
+    // Seed System app in installed_apps if not present
+    let existing_apps: serde_json::Value = sqlx::query_scalar(
+        "SELECT value FROM \"__site_config\" WHERE key = 'installed_apps'",
+    )
+    .fetch_optional(pool)
+    .await
+    .ok()
+    .flatten()
+    .unwrap_or(serde_json::json!([]));
+
+    let mut apps = existing_apps.as_array().cloned().unwrap_or_default();
+    let has_system = apps.iter().any(|a| a.get("name").and_then(|v| v.as_str()) == Some("system"));
+
+    if !has_system {
+        apps.insert(0, serde_json::json!({
+            "name": "system",
+            "title": "System",
+            "icon": "settings",
+            "color": "#6366f1",
+            "modules": ["Core"],
+            "workspace": [
+                { "label": "DocType", "route": "/app/DocType", "icon": "document" },
+                { "label": "User", "route": "/app/User", "icon": "users" },
+                { "label": "Role", "route": "/app/Role", "icon": "shield" },
+                { "label": "Report Builder", "route": "/app/report-builder", "icon": "chart" },
+                { "label": "Permissions", "route": "/app/role-permission-manager", "icon": "lock" }
+            ]
+        }));
+
+        sqlx::query(
+            "INSERT INTO \"__site_config\" (key, value, modified) VALUES ('installed_apps', $1, NOW()) \
+             ON CONFLICT (key) DO UPDATE SET value = $1, modified = NOW()",
+        )
+        .bind(&serde_json::json!(apps))
+        .execute(pool)
+        .await
+        .ok();
+
+        tracing::info!("Seeded System app in installed_apps");
+    }
+
     Ok(())
 }
 

@@ -34,13 +34,15 @@ pub async fn run(args: NewAppArgs) -> anyhow::Result<()> {
     std::fs::write(
         format!("{}/loom_app.toml", app_dir),
         format!(
-            r#"[app]
+            r##"[app]
 name = "{name}"
 version = "0.1.0"
 title = "{title}"
 description = "A Loom application"
+icon = "grid"
+color = "#6366F1"
 modules = ["{module}"]
-"#,
+"##,
             name = slug,
             title = module_title,
             module = module_title,

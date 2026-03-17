@@ -124,10 +124,47 @@ pub async fn export_meta(
     })))
 }
 
-/// GET /api/apps — list available apps
-pub async fn list_apps_handler() -> Json<Value> {
+/// GET /api/apps — list installed apps with metadata (icon, color, modules)
+pub async fn list_apps_handler(
+    State(state): State<AppState>,
+) -> Json<Value> {
+    // Try to get rich metadata from __site_config
+    let installed: Option<Value> = sqlx::query_scalar(
+        "SELECT value FROM \"__site_config\" WHERE key = 'installed_apps'",
+    )
+    .fetch_optional(&state.pool)
+    .await
+    .ok()
+    .flatten();
+
+    if let Some(apps) = installed {
+        return Json(json!({ "data": apps }));
+    }
+
+    // Fallback: scan apps directory and read loom_app.toml for each
     let apps_dir = find_apps_dir();
-    let apps = list_apps(&apps_dir);
+    let mut apps: Vec<Value> = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(&apps_dir) {
+        for entry in entries.flatten() {
+            if !entry.path().is_dir() { continue; }
+            let toml_path = entry.path().join("loom_app.toml");
+            if let Ok(content) = std::fs::read_to_string(&toml_path) {
+                if let Ok(parsed) = content.parse::<toml::Value>() {
+                    if let Some(app) = parsed.get("app") {
+                        apps.push(json!({
+                            "name": app.get("name").and_then(|v| v.as_str()).unwrap_or(""),
+                            "title": app.get("title").and_then(|v| v.as_str()).unwrap_or_else(||
+                                app.get("name").and_then(|v| v.as_str()).unwrap_or("")
+                            ),
+                            "icon": app.get("icon").and_then(|v| v.as_str()),
+                            "color": app.get("color").and_then(|v| v.as_str()),
+                            "modules": app.get("modules").and_then(|v| v.as_array()),
+                        }));
+                    }
+                }
+            }
+        }
+    }
     Json(json!({ "data": apps }))
 }
 

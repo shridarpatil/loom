@@ -126,7 +126,7 @@ async fn validate_session(pool: &PgPool, sid: &str) -> Option<(String, Vec<Strin
 /// Check if a user is enabled. Tries User DocType table first, falls back to __user.
 async fn check_user_enabled(pool: &PgPool, email: &str) -> bool {
     let user_table = loom_core::doctype::doctype_table_name("User");
-    let sql = format!("SELECT enabled FROM \"{}\" WHERE id = $1", user_table);
+    let sql = format!("SELECT enabled::TEXT FROM \"{}\" WHERE id = $1", user_table);
     let result: Option<String> = sqlx::query_scalar(&sql)
         .bind(email)
         .fetch_optional(pool)
@@ -135,7 +135,7 @@ async fn check_user_enabled(pool: &PgPool, email: &str) -> bool {
         .flatten();
 
     if let Some(val) = result {
-        return val == "true" || val == "t";
+        return val == "true" || val == "t" || val == "1" || val == "yes";
     }
 
     // Fallback to __user
@@ -154,7 +154,7 @@ async fn check_user_enabled(pool: &PgPool, email: &str) -> bool {
 /// Get roles for a user. Tries User DocType table first, falls back to __user (legacy).
 async fn get_user_roles(pool: &PgPool, email: &str) -> Vec<String> {
     let user_table = loom_core::doctype::doctype_table_name("User");
-    let sql = format!("SELECT roles_json FROM \"{}\" WHERE id = $1 AND enabled = 't'", user_table);
+    let sql = format!("SELECT roles_json FROM \"{}\" WHERE id = $1 AND enabled = true", user_table);
     let roles_json: Option<Value> = sqlx::query_scalar(&sql)
         .bind(email)
         .fetch_optional(pool)
