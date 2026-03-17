@@ -187,7 +187,7 @@ pub async fn refresh_app_configs(pool: &PgPool, apps_dir: &Path) -> anyhow::Resu
             let hooks: toml::Value = hooks_content.parse().unwrap_or(toml::Value::Table(Default::default()));
             (
                 parse_toml_array(&hooks, "workspace", &["label", "route", "icon"]),
-                parse_toml_array(&hooks, "dashboard", &["type", "label", "doctype", "route", "color"]),
+                parse_toml_array(&hooks, "dashboard", &["type", "label", "doctype", "route", "color", "chart_type", "field", "span", "direction"]),
             )
         } else {
             (vec![], vec![])

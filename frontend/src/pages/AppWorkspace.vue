@@ -14,12 +14,16 @@ interface WorkspaceItem {
 }
 
 interface DashboardWidget {
-  type: "number" | "shortcut" | "list";
+  type: "number" | "shortcut" | "chart";
   label: string;
   doctype?: string;
   filters?: Record<string, unknown>;
   route?: string;
   color?: string;
+  span?: number; // grid columns to span: 1 (default), 2, 3, 4
+  chart_type?: "bar" | "line" | "donut"; // for chart widgets
+  direction?: "horizontal" | "vertical"; // bar chart direction (default: horizontal)
+  field?: string; // field to group by for charts
 }
 
 interface AppInfo {
@@ -36,10 +40,11 @@ const loading = ref(true);
 const editMode = ref(false);
 const widgets = ref<DashboardWidget[]>([]);
 const widgetData = ref<Record<string, number>>({});
+const chartData = ref<Record<string, Array<{ label: string; value: number; color: string }>>>({});
 
 // Add widget modal
 const showAddWidget = ref(false);
-const newWidget = ref<DashboardWidget>({ type: "number", label: "", doctype: "" });
+const newWidget = ref<DashboardWidget>({ type: "number", label: "", doctype: "", span: 1 });
 const doctypes = ref<string[]>([]);
 
 const iconPaths: Record<string, string> = {
@@ -83,10 +88,12 @@ async function loadApp() {
     const dtRes = await loom.resource("DocType").getList({ limit: 100 });
     doctypes.value = (dtRes.data as Array<{ name: string }>).map((d) => d.name).filter((n) => n !== "DocType");
 
-    // Fetch counts for number widgets
+    // Fetch data for widgets
     for (const w of widgets.value) {
       if (w.type === "number" && w.doctype) {
         fetchCount(w);
+      } else if (w.type === "chart" && w.doctype && w.field) {
+        fetchChartData(w);
       }
     }
   } catch { /* */ }
@@ -105,14 +112,41 @@ async function fetchCount(w: DashboardWidget) {
   }
 }
 
+const chartColors = ["#6366f1", "#8B5CF6", "#EC4899", "#F59E0B", "#10B981", "#3B82F6", "#EF4444", "#14B8A6", "#F97316", "#84CC16"];
+
+async function fetchChartData(w: DashboardWidget) {
+  if (!w.doctype || !w.field) return;
+  try {
+    const res = await loom.resource(w.doctype).getList({
+      fields: [w.field],
+      ...(w.filters ? { filters: w.filters } : {}),
+      limit: 10000,
+    });
+    // Group by field value
+    const counts: Record<string, number> = {};
+    for (const row of res.data) {
+      const val = String(row[w.field] || "(empty)");
+      counts[val] = (counts[val] || 0) + 1;
+    }
+    chartData.value[w.label] = Object.entries(counts)
+      .map(([label, value], i) => ({ label, value, color: w.color || chartColors[i % chartColors.length] }))
+      .sort((a, b) => b.value - a.value);
+  } catch {
+    chartData.value[w.label] = [];
+  }
+}
+
 function addWidget() {
   if (!newWidget.value.label) return;
-  widgets.value.push({ ...newWidget.value });
-  newWidget.value = { type: "number", label: "", doctype: "" };
-  showAddWidget.value = false;
-  if (newWidget.value.type === "number" && newWidget.value.doctype) {
-    fetchCount(widgets.value[widgets.value.length - 1]);
+  const w = { ...newWidget.value };
+  widgets.value.push(w);
+  if (w.type === "number" && w.doctype) {
+    fetchCount(w);
+  } else if (w.type === "chart" && w.doctype && w.field) {
+    fetchChartData(w);
   }
+  newWidget.value = { type: "number", label: "", doctype: "", span: 1 };
+  showAddWidget.value = false;
 }
 
 function removeWidget(index: number) {
@@ -186,7 +220,7 @@ watch(() => props.appName, loadApp);
 
       <!-- Dashboard widgets -->
       <div v-if="widgets.length > 0">
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div class="grid grid-cols-4 gap-4">
           <div
             v-for="(widget, wi) in widgets"
             :key="wi"
@@ -194,11 +228,12 @@ watch(() => props.appName, loadApp);
               'bg-white border rounded-xl px-5 py-4 relative group transition-all',
               editMode ? 'border-dashed border-border' : 'border-border/60 shadow-sm shadow-black/[0.02]',
             ]"
+            :style="{ gridColumn: `span ${widget.span || 1}` }"
           >
             <!-- Remove button in edit mode -->
             <button
               v-if="editMode"
-              class="absolute top-2 right-2 p-0.5 text-text-light hover:text-danger opacity-0 group-hover:opacity-100 transition-opacity"
+              class="absolute top-2 right-2 p-0.5 text-text-light hover:text-danger opacity-0 group-hover:opacity-100 transition-opacity z-10"
               @click="removeWidget(wi)"
             >
               <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -227,6 +262,144 @@ watch(() => props.appName, loadApp);
                 </svg>
                 {{ widget.label }}
               </button>
+            </template>
+
+            <!-- Chart widget -->
+            <template v-else-if="widget.type === 'chart'">
+              <div class="text-[13px] font-semibold text-text mb-3">{{ widget.label }}</div>
+              <template v-if="chartData[widget.label]?.length > 0">
+
+                <!-- Horizontal bar chart (default) -->
+                <template v-if="(widget.chart_type === 'bar' || !widget.chart_type) && widget.direction !== 'vertical'">
+                  <div class="space-y-2">
+                    <div v-for="(item, ci) in chartData[widget.label]" :key="ci" class="flex items-center gap-2">
+                      <span class="text-[11px] text-text-muted w-[80px] truncate text-right shrink-0">{{ item.label }}</span>
+                      <div class="flex-1 bg-surface-raised rounded-full h-5 overflow-hidden">
+                        <div
+                          class="h-full rounded-full flex items-center justify-end px-2 text-[10px] font-semibold text-white min-w-[24px] transition-all"
+                          :style="{
+                            width: `${Math.max(10, (item.value / Math.max(...chartData[widget.label].map(d => d.value))) * 100)}%`,
+                            backgroundColor: item.color,
+                          }"
+                        >{{ item.value }}</div>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+
+                <!-- Vertical bar chart -->
+                <template v-else-if="widget.chart_type === 'bar' && widget.direction === 'vertical'">
+                  <div class="flex items-end gap-2 h-[140px]">
+                    <div
+                      v-for="(item, ci) in chartData[widget.label]"
+                      :key="ci"
+                      class="flex-1 flex flex-col items-center gap-1"
+                    >
+                      <span class="text-[10px] font-semibold text-text">{{ item.value }}</span>
+                      <div class="w-full bg-surface-raised rounded-t-md overflow-hidden flex-1 flex items-end">
+                        <div
+                          class="w-full rounded-t-md transition-all"
+                          :style="{
+                            height: `${Math.max(8, (item.value / Math.max(...chartData[widget.label].map(d => d.value))) * 100)}%`,
+                            backgroundColor: item.color,
+                          }"
+                        />
+                      </div>
+                      <span class="text-[10px] text-text-muted truncate w-full text-center">{{ item.label }}</span>
+                    </div>
+                  </div>
+                </template>
+
+                <!-- Line chart -->
+                <template v-else-if="widget.chart_type === 'line'">
+                  <div class="relative">
+                    <svg :viewBox="`0 0 ${chartData[widget.label].length * 60} 120`" class="w-full h-[140px]" preserveAspectRatio="none">
+                      <!-- Grid lines -->
+                      <line x1="0" y1="30" :x2="chartData[widget.label].length * 60" y2="30" stroke="#e2e8f0" stroke-width="0.5" />
+                      <line x1="0" y1="60" :x2="chartData[widget.label].length * 60" y2="60" stroke="#e2e8f0" stroke-width="0.5" />
+                      <line x1="0" y1="90" :x2="chartData[widget.label].length * 60" y2="90" stroke="#e2e8f0" stroke-width="0.5" />
+
+                      <!-- Area fill -->
+                      <polygon
+                        :points="[
+                          ...chartData[widget.label].map((item, ci) => {
+                            const maxVal = Math.max(...chartData[widget.label].map(d => d.value));
+                            const x = ci * 60 + 30;
+                            const y = 110 - (item.value / (maxVal || 1)) * 90;
+                            return `${x},${y}`;
+                          }),
+                          `${(chartData[widget.label].length - 1) * 60 + 30},110`,
+                          `30,110`,
+                        ].join(' ')"
+                        :fill="(widget.color || '#6366f1') + '15'"
+                      />
+
+                      <!-- Line -->
+                      <polyline
+                        :points="chartData[widget.label].map((item, ci) => {
+                          const maxVal = Math.max(...chartData[widget.label].map(d => d.value));
+                          const x = ci * 60 + 30;
+                          const y = 110 - (item.value / (maxVal || 1)) * 90;
+                          return `${x},${y}`;
+                        }).join(' ')"
+                        fill="none"
+                        :stroke="widget.color || '#6366f1'"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+
+                      <!-- Dots -->
+                      <circle
+                        v-for="(item, ci) in chartData[widget.label]"
+                        :key="ci"
+                        :cx="ci * 60 + 30"
+                        :cy="110 - (item.value / (Math.max(...chartData[widget.label].map(d => d.value)) || 1)) * 90"
+                        r="3"
+                        :fill="widget.color || '#6366f1'"
+                        stroke="white"
+                        stroke-width="1.5"
+                      />
+                    </svg>
+                    <!-- Labels -->
+                    <div class="flex justify-between px-2 mt-1">
+                      <span
+                        v-for="(item, ci) in chartData[widget.label]"
+                        :key="ci"
+                        class="text-[10px] text-text-muted text-center"
+                        :style="{ width: `${100 / chartData[widget.label].length}%` }"
+                      >{{ item.label }}</span>
+                    </div>
+                  </div>
+                </template>
+
+                <!-- Donut chart -->
+                <template v-else-if="widget.chart_type === 'donut'">
+                  <div class="flex items-center gap-4">
+                    <svg viewBox="0 0 36 36" class="w-24 h-24 shrink-0">
+                      <template v-for="(item, ci) in chartData[widget.label]" :key="ci">
+                        <circle
+                          class="transition-all"
+                          :cx="18" :cy="18" :r="15.915"
+                          fill="transparent"
+                          :stroke="item.color"
+                          stroke-width="3"
+                          :stroke-dasharray="`${(item.value / chartData[widget.label].reduce((s, d) => s + d.value, 0)) * 100} ${100 - (item.value / chartData[widget.label].reduce((s, d) => s + d.value, 0)) * 100}`"
+                          :stroke-dashoffset="`${-chartData[widget.label].slice(0, ci).reduce((s, d) => s + (d.value / chartData[widget.label].reduce((t, x) => t + x.value, 0)) * 100, 0)}`"
+                        />
+                      </template>
+                    </svg>
+                    <div class="space-y-1">
+                      <div v-for="(item, ci) in chartData[widget.label]" :key="ci" class="flex items-center gap-1.5 text-[11px]">
+                        <div class="w-2 h-2 rounded-full shrink-0" :style="{ backgroundColor: item.color }" />
+                        <span class="text-text-muted">{{ item.label }}</span>
+                        <span class="font-semibold text-text">{{ item.value }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </template>
+              <div v-else class="text-[12px] text-text-light py-4 text-center">No data</div>
             </template>
           </div>
         </div>
@@ -258,22 +431,51 @@ watch(() => props.appName, loadApp);
               <select v-model="newWidget.type" class="w-full h-9 px-3 text-[13px] border border-border rounded-lg">
                 <option value="number">Number Card</option>
                 <option value="shortcut">Shortcut</option>
+                <option value="chart">Chart</option>
               </select>
             </div>
             <div>
               <label class="block text-[12px] font-medium text-text-muted mb-1">Label</label>
               <input v-model="newWidget.label" type="text" placeholder="e.g. Open Todos" class="w-full h-9 px-3 text-[13px] border border-border rounded-lg" />
             </div>
-            <div v-if="newWidget.type === 'number'">
+            <div v-if="newWidget.type === 'number' || newWidget.type === 'chart'">
               <label class="block text-[12px] font-medium text-text-muted mb-1">DocType</label>
               <select v-model="newWidget.doctype" class="w-full h-9 px-3 text-[13px] border border-border rounded-lg">
                 <option value="">Select...</option>
                 <option v-for="dt in doctypes" :key="dt" :value="dt">{{ dt }}</option>
               </select>
             </div>
+            <div v-if="newWidget.type === 'chart'">
+              <label class="block text-[12px] font-medium text-text-muted mb-1">Group By Field</label>
+              <input v-model="newWidget.field" type="text" placeholder="e.g. status, priority" class="w-full h-9 px-3 text-[13px] border border-border rounded-lg" />
+            </div>
+            <div v-if="newWidget.type === 'chart'">
+              <label class="block text-[12px] font-medium text-text-muted mb-1">Chart Type</label>
+              <select v-model="newWidget.chart_type" class="w-full h-9 px-3 text-[13px] border border-border rounded-lg">
+                <option value="bar">Bar</option>
+                <option value="line">Line</option>
+                <option value="donut">Donut</option>
+              </select>
+            </div>
+            <div v-if="newWidget.type === 'chart' && newWidget.chart_type === 'bar'">
+              <label class="block text-[12px] font-medium text-text-muted mb-1">Direction</label>
+              <select v-model="newWidget.direction" class="w-full h-9 px-3 text-[13px] border border-border rounded-lg">
+                <option value="horizontal">Horizontal</option>
+                <option value="vertical">Vertical</option>
+              </select>
+            </div>
             <div v-if="newWidget.type === 'shortcut'">
               <label class="block text-[12px] font-medium text-text-muted mb-1">Route</label>
               <input v-model="newWidget.route" type="text" placeholder="/app/Todo/new" class="w-full h-9 px-3 text-[13px] border border-border rounded-lg" />
+            </div>
+            <div>
+              <label class="block text-[12px] font-medium text-text-muted mb-1">Width (columns: 1-4)</label>
+              <select v-model.number="newWidget.span" class="w-full h-9 px-3 text-[13px] border border-border rounded-lg">
+                <option :value="1">1 column (small)</option>
+                <option :value="2">2 columns (medium)</option>
+                <option :value="3">3 columns (large)</option>
+                <option :value="4">4 columns (full width)</option>
+              </select>
             </div>
           </div>
           <div class="px-5 pb-5 flex justify-end gap-2">
