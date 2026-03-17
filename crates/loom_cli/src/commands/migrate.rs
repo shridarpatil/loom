@@ -1,8 +1,4 @@
 use clap::Args;
-
-use loom_core::db::migrate::{migrate_all, migrate_system_tables, migrate_doctype, seed_admin_to_doctype_table};
-use loom_core::doctype::{DocTypeRegistry, Meta};
-
 use crate::site_config::resolve_db_url;
 
 #[derive(Debug, Args)]
@@ -30,62 +26,9 @@ pub async fn run(args: MigrateArgs) -> anyhow::Result<()> {
         .connect(&db_url)
         .await?;
 
-    // Create system tables first
-    migrate_system_tables(&pool).await?;
-    tracing::info!("System tables ready");
-
-    // Load DocTypes into registry
-    let registry = DocTypeRegistry::new();
-
-    // Bootstrap DocType
-    let doctype_meta = Meta::doctype_meta();
-    migrate_doctype(&pool, &doctype_meta).await?;
-    registry.register(doctype_meta).await;
-
-    // Load from database first (existing state)
-    let db_count = registry.load_from_database(&pool).await?;
-    if db_count > 0 {
-        tracing::info!("Loaded {} DocTypes from database", db_count);
-    }
-
-    // Load core doctypes (overrides DB — core is authoritative)
-    let core_dir = std::path::Path::new("core_doctypes");
-    if core_dir.exists() {
-        let count = registry.load_from_directory(core_dir).await?;
-        if count > 0 {
-            tracing::info!("Loaded {} core DocTypes", count);
-        }
-    }
-
-    // Load from apps directory (overrides DB — filesystem is authoritative in developer mode)
     let apps_dir = std::path::Path::new(&args.apps_dir);
-    if apps_dir.exists() {
-        if let Ok(entries) = std::fs::read_dir(apps_dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.is_dir() {
-                    let doctypes_dir = path.join("doctypes");
-                    if doctypes_dir.exists() {
-                        let count = registry.load_from_directory(&doctypes_dir).await?;
-                        tracing::info!(
-                            "Loaded {} DocTypes from app '{}'",
-                            count,
-                            path.file_name().unwrap_or_default().to_string_lossy()
-                        );
-                    }
-                }
-            }
-        }
-    }
 
-    // Run DDL migrations
-    migrate_all(&pool, &registry).await?;
-
-    // Seed admin + default roles
-    seed_admin_to_doctype_table(&pool).await?;
-
-    // Sync to __doctype table
-    registry.sync_to_database(&pool).await?;
+    super::sync::run_full_migrate(&pool, apps_dir).await?;
 
     tracing::info!("Migrations complete");
     Ok(())
