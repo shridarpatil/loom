@@ -266,41 +266,14 @@ pub async fn apply_customization(pool: &sqlx::PgPool, doctype: &str, meta: &mut 
         }
     }
 
-    // Client script: load file first, then append DB overrides on top.
-    // Both run — file provides the base, DB adds/overrides specific functions.
-    let slug = doctype.to_lowercase().replace(' ', "_");
-    let file_script = load_client_script_from_file(&slug).unwrap_or_default();
-
-    let combined = if !file_script.is_empty() && !client_script.is_empty() {
-        // Both exist — run file first, then DB overrides
-        format!("{}\n\n// --- Site customization overrides ---\n{}", file_script, client_script)
-    } else if !file_script.is_empty() {
-        file_script
-    } else {
-        client_script
-    };
-
-    if !combined.is_empty() {
+    // Client script: loaded from DB (synced by migrate from .client.js files)
+    if !client_script.is_empty() {
         if let Some(obj) = meta.as_object_mut() {
-            obj.insert("client_script".to_string(), json!(combined));
+            obj.insert("client_script".to_string(), json!(client_script));
         }
     }
 }
 
-/// Search apps/*/doctypes/{slug}/{slug}.client.js for a client script file.
-fn load_client_script_from_file(slug: &str) -> Option<String> {
-    let apps_dir = super::doctype::find_apps_dir();
-    if let Ok(entries) = std::fs::read_dir(&apps_dir) {
-        for entry in entries.flatten() {
-            if !entry.path().is_dir() { continue; }
-            let path = entry.path().join("doctypes").join(slug).join(format!("{}.client.js", slug));
-            if path.exists() {
-                return std::fs::read_to_string(&path).ok();
-            }
-        }
-    }
-    None
-}
 
 // =========================================================================
 // Role Permission Manager API
