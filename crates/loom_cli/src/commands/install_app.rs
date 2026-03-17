@@ -149,6 +149,27 @@ pub async fn run(args: InstallAppArgs) -> anyhow::Result<()> {
         } else { vec![] }
     } else { vec![] };
 
+    // Read dashboard widgets from hooks.toml
+    let dashboard_items: Vec<serde_json::Value> = if hooks_path.exists() {
+        if let Ok(content) = std::fs::read_to_string(&hooks_path) {
+            if let Ok(hooks) = content.parse::<toml::Value>() {
+                hooks.get("dashboard")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| arr.iter().filter_map(|item| {
+                        let table = item.as_table()?;
+                        Some(serde_json::json!({
+                            "type": table.get("type").and_then(|v| v.as_str()).unwrap_or("number"),
+                            "label": table.get("label").and_then(|v| v.as_str()).unwrap_or(""),
+                            "doctype": table.get("doctype").and_then(|v| v.as_str()),
+                            "route": table.get("route").and_then(|v| v.as_str()),
+                            "color": table.get("color").and_then(|v| v.as_str()),
+                        }))
+                    }).collect())
+                    .unwrap_or_default()
+            } else { vec![] }
+        } else { vec![] }
+    } else { vec![] };
+
     let app_info = serde_json::json!({
         "name": config.app.name,
         "title": config.app.title.as_deref().unwrap_or(&config.app.name),
@@ -156,6 +177,7 @@ pub async fn run(args: InstallAppArgs) -> anyhow::Result<()> {
         "color": config.app.color,
         "modules": config.app.modules,
         "workspace": workspace_items,
+        "dashboard": dashboard_items,
     });
 
     // Read existing installed_apps, append this one

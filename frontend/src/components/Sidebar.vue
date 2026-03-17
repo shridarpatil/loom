@@ -1,66 +1,122 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
-import { useSidebar } from "@/composables/useSidebar";
 import { useTheme } from "@/composables/useTheme";
 import { useSession } from "@/composables/useSession";
-import { usePlugins } from "@/composables/usePlugins";
 
 const router = useRouter();
 const route = useRoute();
-const { sections, pinnedItems, hiddenItems, loading, load, pin, unpin, hide } = useSidebar();
 const { theme } = useTheme();
 const { user, logout } = useSession();
-const { pages: pluginPages } = usePlugins();
 const collapsed = ref(false);
-const contextMenu = ref<{ x: number; y: number; item: any } | null>(null);
 
-onMounted(() => {
-  load();
-  document.addEventListener("click", () => { contextMenu.value = null; });
+interface WorkspaceItem {
+  label: string;
+  route: string;
+  icon?: string;
+}
+
+interface AppInfo {
+  name: string;
+  title: string;
+  icon?: string;
+  color?: string;
+  modules?: string[];
+  workspace?: WorkspaceItem[];
+}
+
+const installedApps = ref<AppInfo[]>([]);
+const allDoctypes = ref<Array<{ name: string; module: string }>>([]);
+
+// Icon paths
+const iconPaths: Record<string, string> = {
+  home: "M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25",
+  grid: "M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25ZM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25a2.25 2.25 0 01-2.25-2.25v-2.25Z",
+  document: "M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9Z",
+  users: "M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0Zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0Z",
+  settings: "M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28ZM15 12a3 3 0 11-6 0 3 3 0 016 0Z",
+  shield: "M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z",
+  lock: "M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25Z",
+  chart: "M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125Z",
+};
+
+function getIconPath(name?: string): string {
+  return iconPaths[name || "grid"] || iconPaths.grid;
+}
+
+// Detect which app the user is currently in based on the route
+const currentApp = computed<AppInfo | null>(() => {
+  const path = route.path;
+
+  // Check if path matches an app name directly: /app/{app_name}
+  for (const app of installedApps.value) {
+    if (path === `/app/${app.name}` || path.startsWith(`/app/${app.name}/`)) {
+      return app;
+    }
+  }
+
+  // Check if path matches a DocType that belongs to an app's module
+  // e.g., /app/Todo → Todo module → loom_todo app
+  const pathParts = path.split("/");
+  if (pathParts.length >= 3 && pathParts[1] === "app") {
+    const dtName = decodeURIComponent(pathParts[2]);
+    const dt = allDoctypes.value.find((d) => d.name === dtName);
+    if (dt) {
+      for (const app of installedApps.value) {
+        if (app.modules?.includes(dt.module)) {
+          return app;
+        }
+      }
+    }
+  }
+
+  return null;
 });
 
-async function doLogout() {
-  await logout();
-  router.replace("/login");
+const isHome = computed(() => route.path === "/app");
+
+// Sidebar items: app workspace items when inside an app, empty on home
+const sidebarItems = computed<WorkspaceItem[]>(() => {
+  if (currentApp.value?.workspace) {
+    return currentApp.value.workspace;
+  }
+  return [];
+});
+
+function isActive(path: string): boolean {
+  return route.path === path || route.path.startsWith(path + "/");
 }
 
 function navigate(path: string) {
   router.push(path);
 }
 
-function isActive(path: string): boolean {
-  return route.path === path || route.path.startsWith(path + "/");
+async function doLogout() {
+  await logout();
+  router.replace("/login");
 }
 
-function onContextMenu(e: MouseEvent, item: any) {
-  e.preventDefault();
-  contextMenu.value = { x: e.clientX, y: e.clientY, item };
-}
+onMounted(async () => {
+  try {
+    const [appsRes, dtRes] = await Promise.all([
+      fetch("/api/apps", { credentials: "include" }),
+      fetch("/api/resource/DocType?fields=[\"id\",\"module\"]&limit=200", { credentials: "include" }),
+    ]);
 
-// Group by module for collapsible sections
-const groupedSections = computed(() => {
-  return sections.value.map((s) => ({
-    ...s,
-    items: s.items.filter((item: any) => !hiddenItems.value.has(item.name)),
-  })).filter((s) => s.items.length > 0);
+    if (appsRes.ok) {
+      const data = await appsRes.json();
+      installedApps.value = data.data || [];
+    }
+
+    if (dtRes.ok) {
+      const data = await dtRes.json();
+      allDoctypes.value = (data.data || []).map((d: any) => ({
+        name: d.id || d.name,
+        module: d.module || "",
+      }));
+    }
+  } catch { /* */ }
 });
-
-const collapsedSections = ref<Set<string>>(new Set());
-function toggleSection(label: string) {
-  if (collapsedSections.value.has(label)) {
-    collapsedSections.value.delete(label);
-  } else {
-    collapsedSections.value.add(label);
-  }
-  collapsedSections.value = new Set(collapsedSections.value);
-}
-
-const navItems = [
-  { label: "Home", path: "/app", exact: true, icon: "M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" },
-  { label: "Report Builder", path: "/app/report-builder", icon: "M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125Z" },
-  { label: "Permissions", path: "/app/role-permission-manager", icon: "M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" },
-];
 </script>
 
 <template>
@@ -82,134 +138,78 @@ const navItems = [
         </svg>
       </button>
       <template v-if="!collapsed">
-        <img v-if="theme.logo_url" :src="theme.logo_url" :alt="theme.brand_name" class="ml-2 h-5" />
-        <span v-else class="ml-2 font-bold text-[14px] tracking-tight text-primary-600">
-          {{ theme.brand_name }}
-        </span>
+        <!-- Show app title when inside an app, brand when on home -->
+        <template v-if="currentApp">
+          <button
+            class="ml-2 flex items-center gap-1.5 hover:opacity-80 transition-opacity"
+            @click="navigate('/app')"
+            title="Back to Home"
+          >
+            <div
+              class="w-5 h-5 rounded-md flex items-center justify-center"
+              :style="{ backgroundColor: (currentApp.color || '#6366f1') + '18', color: currentApp.color || '#6366f1' }"
+            >
+              <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" :d="getIconPath(currentApp.icon)" />
+              </svg>
+            </div>
+            <span class="font-bold text-[14px] tracking-tight text-text">{{ currentApp.title }}</span>
+          </button>
+        </template>
+        <template v-else>
+          <img v-if="theme.logo_url" :src="theme.logo_url" :alt="theme.brand_name" class="ml-2 h-5" />
+          <span v-else class="ml-2 font-bold text-[14px] tracking-tight text-primary-600">
+            {{ theme.brand_name }}
+          </span>
+        </template>
       </template>
     </div>
 
     <!-- Navigation -->
     <nav class="flex-1 overflow-y-auto px-2 py-2 space-y-0.5">
-      <!-- Main nav items -->
+      <!-- Home link (always shown) -->
       <button
-        v-for="item in navItems"
-        :key="item.path"
         :class="[
           'w-full flex items-center gap-2.5 px-2.5 py-[7px] text-[13px] rounded-lg transition-all duration-150',
-          (item.exact ? route.path === item.path : isActive(item.path))
+          isHome
             ? 'bg-primary-50 text-primary-700 font-medium shadow-sm shadow-primary-100'
             : 'text-text-muted hover:bg-surface-muted hover:text-text'
         ]"
-        @click="navigate(item.path)"
+        @click="navigate('/app')"
       >
         <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-          <path stroke-linecap="round" stroke-linejoin="round" :d="item.icon" />
+          <path stroke-linecap="round" stroke-linejoin="round" :d="iconPaths.home" />
+        </svg>
+        <span v-if="!collapsed">Home</span>
+      </button>
+
+      <!-- Divider when inside an app -->
+      <div v-if="sidebarItems.length > 0" class="border-t border-border/40 mx-2 my-2" />
+
+      <!-- App workspace items -->
+      <button
+        v-for="item in sidebarItems"
+        :key="item.route"
+        :class="[
+          'w-full flex items-center gap-2.5 px-2.5 py-[7px] text-[13px] rounded-lg transition-all duration-150',
+          isActive(item.route)
+            ? 'bg-primary-50 text-primary-700 font-medium shadow-sm shadow-primary-100'
+            : 'text-text-muted hover:bg-surface-muted hover:text-text'
+        ]"
+        @click="navigate(item.route)"
+      >
+        <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" :d="getIconPath(item.icon)" />
         </svg>
         <span v-if="!collapsed">{{ item.label }}</span>
       </button>
 
-      <!-- Plugin Pages -->
-      <template v-if="pluginPages.length > 0">
-        <div v-if="!collapsed" class="pt-3 pb-1 px-2.5">
-          <span class="text-[10px] font-semibold text-text-light/70 uppercase tracking-widest">Apps</span>
-        </div>
-        <div v-else class="border-t border-border/40 mx-2 my-2" />
-        <button
-          v-for="pg in pluginPages"
-          :key="pg.route"
-          :class="[
-            'w-full flex items-center gap-2.5 px-2.5 py-[7px] text-[13px] rounded-lg transition-all duration-150',
-            isActive(pg.route) ? 'bg-primary-50 text-primary-700 font-medium' : 'text-text-muted hover:bg-surface-muted hover:text-text'
-          ]"
-          @click="navigate(pg.route)"
-          :title="pg.label"
-        >
-          <span class="w-4 h-4 shrink-0 rounded-md bg-surface-raised flex items-center justify-center text-[9px] font-bold text-text-light">
-            {{ pg.label.charAt(0) }}
-          </span>
-          <span v-if="!collapsed" class="truncate">{{ pg.label }}</span>
-        </button>
-      </template>
-
-      <!-- Pinned items -->
-      <template v-if="pinnedItems.length > 0">
-        <div v-if="!collapsed" class="pt-3 pb-1 px-2.5">
-          <span class="text-[10px] font-semibold text-text-light/70 uppercase tracking-widest">Pinned</span>
-        </div>
-        <div v-else class="border-t border-border/40 mx-2 my-2" />
-        <button
-          v-for="item in pinnedItems"
-          :key="'pin-' + item.name"
-          :class="[
-            'w-full flex items-center gap-2.5 px-2.5 py-[7px] text-[13px] rounded-lg transition-all duration-150',
-            isActive(item.route) ? 'bg-primary-50 text-primary-700 font-medium' : 'text-text-muted hover:bg-surface-muted hover:text-text'
-          ]"
-          @click="navigate(item.route)"
-          @contextmenu="onContextMenu($event, { ...item, pinned: true })"
-          :title="item.name"
-        >
-          <span class="w-4 h-4 shrink-0 rounded-md bg-primary-50 flex items-center justify-center text-[9px] font-bold text-primary-600">
-            {{ item.name.charAt(0) }}
-          </span>
-          <span v-if="!collapsed" class="truncate">{{ item.name }}</span>
-        </button>
-      </template>
-
-      <!-- Module sections -->
-      <template v-if="groupedSections.length > 0">
-        <template v-for="section in groupedSections" :key="section.label">
-          <div v-if="!collapsed" class="pt-3 pb-1 px-2.5">
-            <button
-              class="w-full flex items-center gap-1.5 text-[10px] font-semibold text-text-light/70 uppercase tracking-widest hover:text-text-muted transition-colors"
-              @click="toggleSection(section.label)"
-            >
-              <svg
-                :class="['w-2.5 h-2.5 transition-transform duration-200', collapsedSections.has(section.label) ? '' : 'rotate-90']"
-                fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"
-              >
-                <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-              </svg>
-              {{ section.label }}
-            </button>
-          </div>
-          <div v-else class="border-t border-border/40 mx-2 my-2" />
-
-          <template v-if="!collapsedSections.has(section.label)">
-            <button
-              v-for="item in section.items"
-              :key="item.name"
-              :class="[
-                'w-full flex items-center gap-2.5 px-2.5 py-[7px] text-[13px] rounded-lg transition-all duration-150',
-                isActive(item.route) ? 'bg-primary-50 text-primary-700 font-medium' : 'text-text-muted hover:bg-surface-muted hover:text-text'
-              ]"
-              @click="navigate(item.route)"
-              @contextmenu="onContextMenu($event, item)"
-              :title="item.name"
-            >
-              <span class="w-4 h-4 shrink-0 rounded-md bg-surface-raised flex items-center justify-center text-[9px] font-bold text-text-light">
-                {{ item.name.charAt(0) }}
-              </span>
-              <span v-if="!collapsed" class="truncate">{{ item.name }}</span>
-            </button>
-          </template>
-        </template>
-      </template>
-
-      <!-- Loading skeleton -->
-      <template v-if="loading && groupedSections.length === 0">
-        <div v-for="i in 4" :key="i" class="flex items-center gap-2.5 px-2.5 py-2">
-          <div class="w-4 h-4 rounded-md bg-surface-raised animate-pulse shrink-0" />
-          <div v-if="!collapsed" class="h-3 rounded bg-surface-raised animate-pulse" :style="{ width: `${40 + i * 20}px` }" />
-        </div>
-      </template>
-
+      <!-- Empty state on home -->
       <div
-        v-if="!loading && groupedSections.length === 0 && pinnedItems.length === 0 && !collapsed"
+        v-if="isHome && sidebarItems.length === 0 && !collapsed"
         class="px-2.5 py-6 text-center"
       >
-        <p class="text-[12px] text-text-light">No DocTypes yet</p>
-        <button class="mt-1 text-[12px] text-primary-600 hover:text-primary-700" @click="navigate('/app/DocType/new')">Create one</button>
+        <p class="text-[12px] text-text-light">Select an app</p>
       </div>
     </nav>
 
@@ -232,29 +232,5 @@ const navItems = [
         </button>
       </div>
     </div>
-
-    <!-- Context menu -->
-    <Teleport to="body">
-      <div
-        v-if="contextMenu"
-        class="fixed z-50 bg-white border border-border rounded-xl shadow-xl shadow-black/8 py-1 min-w-[150px] animate-scale-in"
-        :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
-      >
-        <button
-          v-if="!contextMenu.item.pinned"
-          class="w-full text-left px-3 py-2 text-[13px] text-text-muted hover:bg-surface-muted hover:text-text transition-colors"
-          @click="pin(contextMenu.item); contextMenu = null"
-        >Pin to top</button>
-        <button
-          v-if="contextMenu.item.pinned"
-          class="w-full text-left px-3 py-2 text-[13px] text-text-muted hover:bg-surface-muted hover:text-text transition-colors"
-          @click="unpin(contextMenu.item.name); contextMenu = null"
-        >Unpin</button>
-        <button
-          class="w-full text-left px-3 py-2 text-[13px] text-text-muted hover:bg-surface-muted hover:text-text transition-colors"
-          @click="hide(contextMenu.item.name); contextMenu = null"
-        >Hide</button>
-      </div>
-    </Teleport>
   </aside>
 </template>
