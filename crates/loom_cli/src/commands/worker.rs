@@ -37,7 +37,9 @@ pub async fn run(args: WorkerArgs) -> anyhow::Result<()> {
 
     // Load shared registry
     let registry = std::sync::Arc::new(loom_core::doctype::DocTypeRegistry::new());
-    registry.register(loom_core::doctype::Meta::doctype_meta()).await;
+    registry
+        .register(loom_core::doctype::Meta::doctype_meta())
+        .await;
     let _ = registry.load_from_database(&pool).await;
 
     let pool = Arc::new(pool);

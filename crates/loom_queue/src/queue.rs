@@ -38,7 +38,12 @@ pub struct EnqueueOptions {
 }
 
 /// Enqueue a job for background execution.
-pub async fn enqueue(pool: &PgPool, method: &str, args: &Value, opts: EnqueueOptions) -> QueueResult<i64> {
+pub async fn enqueue(
+    pool: &PgPool,
+    method: &str,
+    args: &Value,
+    opts: EnqueueOptions,
+) -> QueueResult<i64> {
     let queue = opts.queue.as_deref().unwrap_or("default");
     let priority = opts.priority.unwrap_or(0);
     let max_retries = opts.max_retries.unwrap_or(3);
@@ -56,7 +61,13 @@ pub async fn enqueue(pool: &PgPool, method: &str, args: &Value, opts: EnqueueOpt
     .await
     .map_err(|e| QueueError::Internal(format!("Failed to enqueue: {}", e)))?;
 
-    tracing::info!("Enqueued job {} for '{}' on queue '{}' (priority {})", id, method, queue, priority);
+    tracing::info!(
+        "Enqueued job {} for '{}' on queue '{}' (priority {})",
+        id,
+        method,
+        queue,
+        priority
+    );
     Ok(id)
 }
 
@@ -79,17 +90,19 @@ pub async fn dequeue(pool: &PgPool, queue_name: &str) -> QueueResult<Option<Job>
     .await
     .map_err(|e| QueueError::Internal(format!("Failed to dequeue: {}", e)))?;
 
-    Ok(row.map(|(id, method, args, queue, priority, attempts, max_retries)| Job {
-        id,
-        method,
-        args,
-        queue,
-        priority,
-        status: "running".to_string(),
-        attempts,
-        max_retries,
-        error: None,
-    }))
+    Ok(row.map(
+        |(id, method, args, queue, priority, attempts, max_retries)| Job {
+            id,
+            method,
+            args,
+            queue,
+            priority,
+            status: "running".to_string(),
+            attempts,
+            max_retries,
+            error: None,
+        },
+    ))
 }
 
 /// Mark a job as completed.
@@ -103,14 +116,21 @@ pub async fn mark_completed(pool: &PgPool, job_id: i64) -> QueueResult<()> {
 }
 
 /// Mark a job as failed. Re-queues if retries remain.
-pub async fn mark_failed(pool: &PgPool, job_id: i64, error: &str, can_retry: bool) -> QueueResult<()> {
+pub async fn mark_failed(
+    pool: &PgPool,
+    job_id: i64,
+    error: &str,
+    can_retry: bool,
+) -> QueueResult<()> {
     let new_status = if can_retry { "queued" } else { "failed" };
-    sqlx::query("UPDATE \"__job_queue\" SET status = $1, error = $2, finished = NOW() WHERE id = $3")
-        .bind(new_status)
-        .bind(error)
-        .bind(job_id)
-        .execute(pool)
-        .await
-        .map_err(|e| QueueError::Internal(e.to_string()))?;
+    sqlx::query(
+        "UPDATE \"__job_queue\" SET status = $1, error = $2, finished = NOW() WHERE id = $3",
+    )
+    .bind(new_status)
+    .bind(error)
+    .bind(job_id)
+    .execute(pool)
+    .await
+    .map_err(|e| QueueError::Internal(e.to_string()))?;
     Ok(())
 }

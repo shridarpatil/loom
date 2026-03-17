@@ -6,11 +6,31 @@ fn test_workflow() -> Workflow {
         document_type: "Leave Application".into(),
         is_active: true,
         states: vec![
-            WorkflowState { state: "Draft".into(), doc_status: 0, allow_edit: None },
-            WorkflowState { state: "Pending".into(), doc_status: 0, allow_edit: Some("HR Manager".into()) },
-            WorkflowState { state: "Approved".into(), doc_status: 1, allow_edit: None },
-            WorkflowState { state: "Rejected".into(), doc_status: 0, allow_edit: None },
-            WorkflowState { state: "Cancelled".into(), doc_status: 2, allow_edit: None },
+            WorkflowState {
+                state: "Draft".into(),
+                doc_status: 0,
+                allow_edit: None,
+            },
+            WorkflowState {
+                state: "Pending".into(),
+                doc_status: 0,
+                allow_edit: Some("HR Manager".into()),
+            },
+            WorkflowState {
+                state: "Approved".into(),
+                doc_status: 1,
+                allow_edit: None,
+            },
+            WorkflowState {
+                state: "Rejected".into(),
+                doc_status: 0,
+                allow_edit: None,
+            },
+            WorkflowState {
+                state: "Cancelled".into(),
+                doc_status: 2,
+                allow_edit: None,
+            },
         ],
         transitions: vec![
             WorkflowTransition {

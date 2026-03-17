@@ -18,9 +18,4 @@ pub struct RoleProfile {
 }
 
 /// Built-in system roles.
-pub const SYSTEM_ROLES: &[&str] = &[
-    "Administrator",
-    "System Manager",
-    "All",
-    "Guest",
-];
+pub const SYSTEM_ROLES: &[&str] = &["Administrator", "System Manager", "All", "Guest"];

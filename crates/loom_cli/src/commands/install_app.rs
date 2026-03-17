@@ -51,7 +51,10 @@ pub async fn run(args: InstallAppArgs) -> anyhow::Result<()> {
 
     let config_path = app_path.join("loom_app.toml");
     if !config_path.exists() {
-        anyhow::bail!("No loom_app.toml found at {:?}. Is this a valid Loom app?", config_path);
+        anyhow::bail!(
+            "No loom_app.toml found at {:?}. Is this a valid Loom app?",
+            config_path
+        );
     }
     let config_str = std::fs::read_to_string(&config_path)?;
     let config: AppConfig = toml::from_str(&config_str)?;

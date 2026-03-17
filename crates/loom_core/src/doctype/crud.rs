@@ -25,8 +25,12 @@ pub async fn insert_doc(
     let mut idx = 1;
 
     for (key, value) in obj {
-        let is_standard = STANDARD_FIELDS.iter().any(|(name, _)| *name == key.as_str());
-        let is_meta_field = meta.get_field(key).is_some_and(|f| f.fieldtype.has_column());
+        let is_standard = STANDARD_FIELDS
+            .iter()
+            .any(|(name, _)| *name == key.as_str());
+        let is_meta_field = meta
+            .get_field(key)
+            .is_some_and(|f| f.fieldtype.has_column());
 
         if is_standard || is_meta_field {
             let cast = sql_cast_for_key(key, meta);
@@ -38,7 +42,9 @@ pub async fn insert_doc(
     }
 
     if columns.is_empty() {
-        return Err(LoomError::Validation("No valid fields to insert".to_string()));
+        return Err(LoomError::Validation(
+            "No valid fields to insert".to_string(),
+        ));
     }
 
     let sql = format!(
@@ -217,7 +223,9 @@ pub async fn update_doc(
             continue; // Don't update immutable fields
         }
         let is_standard = STANDARD_FIELDS.iter().any(|(n, _)| *n == key.as_str());
-        let is_meta_field = meta.get_field(key).is_some_and(|f| f.fieldtype.has_column());
+        let is_meta_field = meta
+            .get_field(key)
+            .is_some_and(|f| f.fieldtype.has_column());
 
         if is_standard || is_meta_field {
             let cast = sql_cast_for_key(key, meta);
@@ -270,11 +278,7 @@ pub async fn delete_doc(pool: &PgPool, meta: &Meta, name: &str) -> LoomResult<()
 }
 
 /// Get the count of documents matching filters.
-pub async fn get_count(
-    pool: &PgPool,
-    meta: &Meta,
-    filters: Option<&Value>,
-) -> LoomResult<i64> {
+pub async fn get_count(pool: &PgPool, meta: &Meta, filters: Option<&Value>) -> LoomResult<i64> {
     let table = meta.table_name();
     let mut sql = format!("SELECT COUNT(*) FROM \"{}\"", table);
     let mut bind_values: Vec<String> = Vec::new();
@@ -298,11 +302,7 @@ pub async fn get_count(
 }
 
 /// Check if a document exists.
-pub async fn exists(
-    pool: &PgPool,
-    meta: &Meta,
-    filters: &Value,
-) -> LoomResult<bool> {
+pub async fn exists(pool: &PgPool, meta: &Meta, filters: &Value) -> LoomResult<bool> {
     let count = get_count(pool, meta, Some(filters)).await?;
     Ok(count > 0)
 }
@@ -328,12 +328,7 @@ fn parse_filters_into(
         for (key, value) in obj {
             let cast = sql_cast_for_key(key, meta);
             bind_values.push(value_to_sql_string(value));
-            where_clauses.push(format!(
-                "\"{}\" = ${}{}",
-                key,
-                bind_values.len(),
-                cast,
-            ));
+            where_clauses.push(format!("\"{}\" = ${}{}", key, bind_values.len(), cast,));
         }
         return;
     }
@@ -475,7 +470,11 @@ pub async fn apply_fetch_from(pool: &PgPool, meta: &Meta, doc: &mut Value) -> Lo
         .filter_map(|f| {
             let fetch = f.fetch_from.as_deref()?;
             let (link_field, source_field) = fetch.split_once('.')?;
-            Some((f.fieldname.as_str(), link_field.to_string(), source_field.to_string()))
+            Some((
+                f.fieldname.as_str(),
+                link_field.to_string(),
+                source_field.to_string(),
+            ))
         })
         .collect();
 
@@ -673,7 +672,9 @@ fn sql_cast_for_key(key: &str, meta: &Meta) -> &'static str {
             super::meta::FieldType::Datetime => return "::TIMESTAMP",
             super::meta::FieldType::Time => return "::TIME",
             super::meta::FieldType::Int => return "::BIGINT",
-            super::meta::FieldType::Float | super::meta::FieldType::Percent => return "::DOUBLE PRECISION",
+            super::meta::FieldType::Float | super::meta::FieldType::Percent => {
+                return "::DOUBLE PRECISION"
+            }
             super::meta::FieldType::Currency => return "::NUMERIC",
             super::meta::FieldType::Check => return "::BOOLEAN",
             super::meta::FieldType::JSON | super::meta::FieldType::Geolocation => return "::JSONB",
@@ -698,7 +699,11 @@ fn sanitize_order_by(input: &str) -> String {
                 }
                 [field, dir] => {
                     let f = sanitize_identifier(field);
-                    let d = if dir.eq_ignore_ascii_case("asc") { "ASC" } else { "DESC" };
+                    let d = if dir.eq_ignore_ascii_case("asc") {
+                        "ASC"
+                    } else {
+                        "DESC"
+                    };
                     format!("\"{}\" {}", f, d)
                 }
                 _ => "\"modified\" DESC".to_string(),

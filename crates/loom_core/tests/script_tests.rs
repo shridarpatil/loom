@@ -1,5 +1,5 @@
-use loom_core::script::{create_engine, compile_script, call_function};
 use loom_core::script::api::register_loom_api;
+use loom_core::script::{call_function, compile_script, create_engine};
 
 #[test]
 fn test_create_engine() {
@@ -57,7 +57,9 @@ fn test_loom_api_now() {
 fn test_loom_api_date_diff() {
     let mut engine = create_engine();
     register_loom_api(&mut engine);
-    let result: i64 = engine.eval(r#"date_diff("2026-03-20", "2026-03-15")"#).unwrap();
+    let result: i64 = engine
+        .eval(r#"date_diff("2026-03-20", "2026-03-15")"#)
+        .unwrap();
     assert_eq!(result, 5);
 }
 

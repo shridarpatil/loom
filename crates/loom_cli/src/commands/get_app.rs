@@ -15,7 +15,10 @@ pub async fn run(args: GetAppArgs) -> anyhow::Result<()> {
     let source = &args.source;
 
     // Determine source type and extract app name
-    let app_name = args.app_name.clone().unwrap_or_else(|| derive_app_name(source));
+    let app_name = args
+        .app_name
+        .clone()
+        .unwrap_or_else(|| derive_app_name(source));
     let target = Path::new("apps").join(&app_name);
 
     if target.exists() {

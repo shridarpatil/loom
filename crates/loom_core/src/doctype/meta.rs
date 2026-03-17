@@ -186,8 +186,12 @@ impl FieldType {
     /// Returns the SQL column type for this field type (PostgreSQL).
     pub fn sql_type(&self) -> &'static str {
         match self {
-            FieldType::Data | FieldType::Link | FieldType::DynamicLink | FieldType::Select
-            | FieldType::Password | FieldType::Color => "VARCHAR(140)",
+            FieldType::Data
+            | FieldType::Link
+            | FieldType::DynamicLink
+            | FieldType::Select
+            | FieldType::Password
+            | FieldType::Color => "VARCHAR(140)",
             FieldType::Int => "BIGINT",
             FieldType::Float | FieldType::Percent => "DOUBLE PRECISION",
             FieldType::Currency => "NUMERIC(18, 6)",
@@ -195,8 +199,11 @@ impl FieldType {
             FieldType::Date => "DATE",
             FieldType::Datetime => "TIMESTAMP",
             FieldType::Time => "TIME",
-            FieldType::Text | FieldType::SmallText | FieldType::Code
-            | FieldType::TextEditor | FieldType::HTMLEditor => "TEXT",
+            FieldType::Text
+            | FieldType::SmallText
+            | FieldType::Code
+            | FieldType::TextEditor
+            | FieldType::HTMLEditor => "TEXT",
             FieldType::LongText => "TEXT",
             FieldType::Attach | FieldType::AttachImage => "TEXT",
             FieldType::Table => "TEXT", // stored as JSON array
@@ -273,7 +280,9 @@ impl Meta {
                     fieldname: "naming_rule".to_string(),
                     label: Some("Naming Rule".to_string()),
                     fieldtype: FieldType::Select,
-                    options: Some("autoincrement\nhash\nby_fieldname\nseries\nprompt\nexpression".to_string()),
+                    options: Some(
+                        "autoincrement\nhash\nby_fieldname\nseries\nprompt\nexpression".to_string(),
+                    ),
                     ..DocFieldMeta::default()
                 },
                 DocFieldMeta {
@@ -500,7 +509,10 @@ pub fn merge_permission_overrides(
         let key = (d.role.clone(), d.permlevel);
         default_keys.insert(key.clone());
         if override_keys.contains(&key) {
-            if let Some(o) = overrides.iter().find(|o| o.role == d.role && o.permlevel == d.permlevel) {
+            if let Some(o) = overrides
+                .iter()
+                .find(|o| o.role == d.role && o.permlevel == d.permlevel)
+            {
                 merged.push(o.clone());
             }
         } else {
@@ -520,19 +532,26 @@ pub fn merge_permission_overrides(
 
 /// Set standard fields for a new document (insert).
 pub fn set_standard_fields_on_insert(doc: &mut serde_json::Value, user: &str) {
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S%.6f").to_string();
+    let now = chrono::Utc::now()
+        .format("%Y-%m-%d %H:%M:%S%.6f")
+        .to_string();
     if let Some(obj) = doc.as_object_mut() {
-        obj.entry("owner").or_insert_with(|| serde_json::json!(user));
-        obj.entry("creation").or_insert_with(|| serde_json::json!(&now));
+        obj.entry("owner")
+            .or_insert_with(|| serde_json::json!(user));
+        obj.entry("creation")
+            .or_insert_with(|| serde_json::json!(&now));
         obj.insert("modified".to_string(), serde_json::json!(&now));
         obj.insert("modified_by".to_string(), serde_json::json!(user));
-        obj.entry("docstatus").or_insert_with(|| serde_json::json!(0));
+        obj.entry("docstatus")
+            .or_insert_with(|| serde_json::json!(0));
     }
 }
 
 /// Set standard fields for an existing document (update).
 pub fn set_standard_fields_on_update(doc: &mut serde_json::Value, user: &str) {
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S%.6f").to_string();
+    let now = chrono::Utc::now()
+        .format("%Y-%m-%d %H:%M:%S%.6f")
+        .to_string();
     if let Some(obj) = doc.as_object_mut() {
         obj.insert("modified".to_string(), serde_json::json!(&now));
         obj.insert("modified_by".to_string(), serde_json::json!(user));

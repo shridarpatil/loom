@@ -19,9 +19,9 @@ pub struct NewSiteArgs {
 }
 
 pub async fn run(args: NewSiteArgs) -> anyhow::Result<()> {
-    let db_name = args.db_name.unwrap_or_else(|| {
-        args.site_name.replace('.', "_").replace('-', "_")
-    });
+    let db_name = args
+        .db_name
+        .unwrap_or_else(|| args.site_name.replace('.', "_").replace('-', "_"));
 
     tracing::info!(
         "Creating new site '{}' with database '{}'",

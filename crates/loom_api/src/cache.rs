@@ -68,8 +68,8 @@ impl AppCache {
     pub fn new() -> Self {
         Self {
             sessions: TtlCache::new(3600),         // 1 hour — invalidated on logout
-            customizations: TtlCache::new(86400),   // 24 hours — invalidated on save
-            user_permissions: TtlCache::new(3600),   // 1 hour — invalidated on role change
+            customizations: TtlCache::new(86400),  // 24 hours — invalidated on save
+            user_permissions: TtlCache::new(3600), // 1 hour — invalidated on role change
         }
     }
 
@@ -89,24 +89,26 @@ impl AppCache {
             cached
         } else {
             // Cache miss — query DB
-            let row: Option<(serde_json::Value,)> = sqlx::query_as(
-                "SELECT overrides FROM \"__customization\" WHERE doctype = $1",
-            )
-            .bind(doctype)
-            .fetch_optional(pool)
-            .await
-            .unwrap_or(None);
+            let row: Option<(serde_json::Value,)> =
+                sqlx::query_as("SELECT overrides FROM \"__customization\" WHERE doctype = $1")
+                    .bind(doctype)
+                    .fetch_optional(pool)
+                    .await
+                    .unwrap_or(None);
 
             let val = row.map(|(v,)| v);
-            self.customizations.set(doctype.to_string(), val.clone()).await;
+            self.customizations
+                .set(doctype.to_string(), val.clone())
+                .await;
             val
         };
 
         // Apply permission overrides (merge logic)
         if let Some(overrides) = overrides {
             if let Some(perm_overrides) = overrides.get("__permissions") {
-                if let Ok(override_perms) =
-                    serde_json::from_value::<Vec<loom_core::doctype::DocPermMeta>>(perm_overrides.clone())
+                if let Ok(override_perms) = serde_json::from_value::<
+                    Vec<loom_core::doctype::DocPermMeta>,
+                >(perm_overrides.clone())
                 {
                     meta.permissions = loom_core::doctype::merge_permission_overrides(
                         &meta.permissions,
@@ -130,7 +132,9 @@ impl AppCache {
         }
 
         let perms = loom_core::perms::get_user_permissions(pool, user).await?;
-        self.user_permissions.set(user.to_string(), perms.clone()).await;
+        self.user_permissions
+            .set(user.to_string(), perms.clone())
+            .await;
         Ok(perms)
     }
 

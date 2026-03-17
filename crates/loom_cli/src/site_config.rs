@@ -24,7 +24,10 @@ impl SiteConfig {
         if password.is_empty() {
             format!("postgres://{}@{}:{}/{}", user, host, port, name)
         } else {
-            format!("postgres://{}:{}@{}:{}/{}", user, password, host, port, name)
+            format!(
+                "postgres://{}:{}@{}:{}/{}",
+                user, password, host, port, name
+            )
         }
     }
 }

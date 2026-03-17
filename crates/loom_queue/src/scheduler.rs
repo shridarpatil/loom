@@ -56,11 +56,22 @@ impl Scheduler {
                 Err(_) => continue,
             };
 
-            if let Some(schedulers) = hooks.get("scheduler").and_then(|v: &toml::Value| v.as_array()) {
+            if let Some(schedulers) = hooks
+                .get("scheduler")
+                .and_then(|v: &toml::Value| v.as_array())
+            {
                 for entry in schedulers {
                     if let Some(table) = entry.as_table() {
-                        let cron = table.get("cron").and_then(|v: &toml::Value| v.as_str()).unwrap_or("").to_string();
-                        let method = table.get("method").and_then(|v: &toml::Value| v.as_str()).unwrap_or("").to_string();
+                        let cron = table
+                            .get("cron")
+                            .and_then(|v: &toml::Value| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        let method = table
+                            .get("method")
+                            .and_then(|v: &toml::Value| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
                         if !cron.is_empty() && !method.is_empty() {
                             tracing::info!("Registered scheduled task: {} ({})", method, cron);
                             self.tasks.push(ScheduledTask { cron, method });
@@ -86,8 +97,19 @@ impl Scheduler {
             for task in &self.tasks {
                 if should_run(&task.cron, &now) {
                     tracing::info!("Scheduling task: {}", task.method);
-                    if let Err(e) = queue::enqueue(&self.pool, &task.method, &serde_json::json!({}), Default::default()).await {
-                        tracing::error!("Failed to enqueue scheduled task '{}': {}", task.method, e);
+                    if let Err(e) = queue::enqueue(
+                        &self.pool,
+                        &task.method,
+                        &serde_json::json!({}),
+                        Default::default(),
+                    )
+                    .await
+                    {
+                        tracing::error!(
+                            "Failed to enqueue scheduled task '{}': {}",
+                            task.method,
+                            e
+                        );
                     }
                 }
             }
@@ -96,7 +118,9 @@ impl Scheduler {
             let next_minute = (now + chrono::Duration::seconds(60))
                 .with_second(0)
                 .unwrap_or(now);
-            let sleep_duration = (next_minute - now).to_std().unwrap_or(Duration::from_secs(60));
+            let sleep_duration = (next_minute - now)
+                .to_std()
+                .unwrap_or(Duration::from_secs(60));
             tokio::time::sleep(sleep_duration).await;
         }
     }
@@ -144,7 +168,9 @@ fn matches_cron_field(pattern: &str, value: u32) -> bool {
     }
     // Comma-separated values
     if pattern.contains(',') {
-        return pattern.split(',').any(|p| p.trim().parse::<u32>().ok() == Some(value));
+        return pattern
+            .split(',')
+            .any(|p| p.trim().parse::<u32>().ok() == Some(value));
     }
     false
 }

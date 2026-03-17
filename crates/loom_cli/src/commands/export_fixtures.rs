@@ -2,7 +2,7 @@ use clap::Args;
 use sqlx::postgres::PgPoolOptions;
 
 use loom_core::db::migrate::migrate_system_tables;
-use loom_core::doctype::{DocTypeRegistry, Meta, crud};
+use loom_core::doctype::{crud, DocTypeRegistry, Meta};
 
 #[derive(Debug, Args)]
 pub struct ExportFixturesArgs {
@@ -77,8 +77,12 @@ pub async fn run(args: ExportFixturesArgs) -> anyhow::Result<()> {
 
         let meta = registry.get_meta(doctype).await?;
         let app = args.app.unwrap_or_else(|| {
-            find_app_for_doctype(apps_dir, &doctype.to_lowercase().replace(' ', "_"), &meta.module)
-                .unwrap_or_else(|| "unknown".to_string())
+            find_app_for_doctype(
+                apps_dir,
+                &doctype.to_lowercase().replace(' ', "_"),
+                &meta.module,
+            )
+            .unwrap_or_else(|| "unknown".to_string())
         });
 
         export_one(&pool, &registry, doctype, filters.as_ref(), &app, apps_dir).await?;
@@ -87,7 +91,9 @@ pub async fn run(args: ExportFixturesArgs) -> anyhow::Result<()> {
         let decls = load_fixture_declarations(apps_dir);
         if decls.is_empty() {
             println!("No [[fixtures]] declared in any app's hooks.toml.");
-            println!("Usage: loom export-fixtures --doctype Role --filters '{{\"module\":\"HR\"}}'");
+            println!(
+                "Usage: loom export-fixtures --doctype Role --filters '{{\"module\":\"HR\"}}'"
+            );
             println!("Or add to hooks.toml:");
             println!("  [[fixtures]]");
             println!("  doctype = \"Role\"");
@@ -96,7 +102,15 @@ pub async fn run(args: ExportFixturesArgs) -> anyhow::Result<()> {
         }
 
         for decl in &decls {
-            export_one(&pool, &registry, &decl.doctype, decl.filters.as_ref(), &decl.app, apps_dir).await?;
+            export_one(
+                &pool,
+                &registry,
+                &decl.doctype,
+                decl.filters.as_ref(),
+                &decl.app,
+                apps_dir,
+            )
+            .await?;
         }
     }
 
@@ -128,7 +142,13 @@ async fn export_one(
     let pretty = serde_json::to_string_pretty(&docs)?;
     std::fs::write(&file_path, &pretty)?;
 
-    println!("  {} — {} record(s) → apps/{}/fixtures/{}.json", doctype, docs.len(), app, slug);
+    println!(
+        "  {} — {} record(s) → apps/{}/fixtures/{}.json",
+        doctype,
+        docs.len(),
+        app,
+        slug
+    );
     Ok(())
 }
 
@@ -194,11 +214,7 @@ fn load_fixture_declarations(apps_dir: &std::path::Path) -> Vec<FixtureDecl> {
     decls
 }
 
-fn find_app_for_doctype(
-    apps_dir: &std::path::Path,
-    slug: &str,
-    module: &str,
-) -> Option<String> {
+fn find_app_for_doctype(apps_dir: &std::path::Path, slug: &str, module: &str) -> Option<String> {
     // Check which app has this doctype
     if let Ok(entries) = std::fs::read_dir(apps_dir) {
         for entry in entries.flatten() {

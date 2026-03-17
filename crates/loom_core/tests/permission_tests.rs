@@ -31,8 +31,18 @@ fn test_meta() -> Meta {
             },
         ],
         fields: vec![
-            DocFieldMeta { fieldname: "title".into(), fieldtype: FieldType::Data, permlevel: 0, ..DocFieldMeta::default() },
-            DocFieldMeta { fieldname: "salary".into(), fieldtype: FieldType::Currency, permlevel: 1, ..DocFieldMeta::default() },
+            DocFieldMeta {
+                fieldname: "title".into(),
+                fieldtype: FieldType::Data,
+                permlevel: 0,
+                ..DocFieldMeta::default()
+            },
+            DocFieldMeta {
+                fieldname: "salary".into(),
+                fieldtype: FieldType::Currency,
+                permlevel: 1,
+                ..DocFieldMeta::default()
+            },
         ],
         ..Meta::default()
     }
@@ -42,26 +52,74 @@ fn test_meta() -> Meta {
 fn test_has_permission_basic() {
     let meta = test_meta();
     let roles = vec!["All".into()];
-    assert!(has_permission(&meta, None, PermType::Read, "user@test.com", &roles));
-    assert!(!has_permission(&meta, None, PermType::Write, "user@test.com", &roles));
+    assert!(has_permission(
+        &meta,
+        None,
+        PermType::Read,
+        "user@test.com",
+        &roles
+    ));
+    assert!(!has_permission(
+        &meta,
+        None,
+        PermType::Write,
+        "user@test.com",
+        &roles
+    ));
 }
 
 #[test]
 fn test_has_permission_editor() {
     let meta = test_meta();
     let roles = vec!["All".into(), "Editor".into()];
-    assert!(has_permission(&meta, None, PermType::Read, "editor@test.com", &roles));
-    assert!(has_permission(&meta, None, PermType::Write, "editor@test.com", &roles));
-    assert!(has_permission(&meta, None, PermType::Create, "editor@test.com", &roles));
+    assert!(has_permission(
+        &meta,
+        None,
+        PermType::Read,
+        "editor@test.com",
+        &roles
+    ));
+    assert!(has_permission(
+        &meta,
+        None,
+        PermType::Write,
+        "editor@test.com",
+        &roles
+    ));
+    assert!(has_permission(
+        &meta,
+        None,
+        PermType::Create,
+        "editor@test.com",
+        &roles
+    ));
 }
 
 #[test]
 fn test_has_permission_admin_bypass() {
     let meta = test_meta();
     let roles = vec!["Administrator".into()];
-    assert!(has_permission(&meta, None, PermType::Read, "Administrator", &roles));
-    assert!(has_permission(&meta, None, PermType::Write, "Administrator", &roles));
-    assert!(has_permission(&meta, None, PermType::Delete, "Administrator", &roles));
+    assert!(has_permission(
+        &meta,
+        None,
+        PermType::Read,
+        "Administrator",
+        &roles
+    ));
+    assert!(has_permission(
+        &meta,
+        None,
+        PermType::Write,
+        "Administrator",
+        &roles
+    ));
+    assert!(has_permission(
+        &meta,
+        None,
+        PermType::Delete,
+        "Administrator",
+        &roles
+    ));
 }
 
 #[test]
@@ -78,14 +136,12 @@ fn test_allowed_permlevels_read_includes_zero() {
 fn test_allowed_permlevels_level1_only_includes_zero_for_read() {
     let meta = Meta {
         name: "Test".into(),
-        permissions: vec![
-            DocPermMeta {
-                role: "Special".into(),
-                permlevel: 1,
-                read: true,
-                ..DocPermMeta::default()
-            },
-        ],
+        permissions: vec![DocPermMeta {
+            role: "Special".into(),
+            permlevel: 1,
+            read: true,
+            ..DocPermMeta::default()
+        }],
         ..Meta::default()
     };
     let roles = vec!["Special".into()];
@@ -150,9 +206,21 @@ fn test_if_owner_permission() {
 
     // Owner matches
     let doc = serde_json::json!({ "owner": "user@test.com" });
-    assert!(has_permission(&meta, Some(&doc), PermType::Read, "user@test.com", &roles));
+    assert!(has_permission(
+        &meta,
+        Some(&doc),
+        PermType::Read,
+        "user@test.com",
+        &roles
+    ));
 
     // Owner doesn't match
     let doc = serde_json::json!({ "owner": "other@test.com" });
-    assert!(!has_permission(&meta, Some(&doc), PermType::Read, "user@test.com", &roles));
+    assert!(!has_permission(
+        &meta,
+        Some(&doc),
+        PermType::Read,
+        "user@test.com",
+        &roles
+    ));
 }

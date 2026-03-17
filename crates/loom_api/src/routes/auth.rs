@@ -1,8 +1,8 @@
 use axum::{
     extract::State,
     http::{header::SET_COOKIE, StatusCode},
-    Json,
     response::IntoResponse,
+    Json,
 };
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -133,20 +133,22 @@ pub async fn signup(
     let user_table = loom_core::doctype::doctype_table_name("User");
 
     // Check if user exists (check both User table and __user)
-    let check_sql = format!("SELECT EXISTS (SELECT 1 FROM \"{}\" WHERE id = $1 OR email = $1)", user_table);
+    let check_sql = format!(
+        "SELECT EXISTS (SELECT 1 FROM \"{}\" WHERE id = $1 OR email = $1)",
+        user_table
+    );
     let exists_tab: bool = sqlx::query_scalar(&check_sql)
         .bind(&body.email)
         .fetch_one(&state.pool)
         .await
         .unwrap_or(false);
 
-    let exists_legacy: bool = sqlx::query_scalar(
-        "SELECT EXISTS (SELECT 1 FROM \"__user\" WHERE email = $1)",
-    )
-    .bind(&body.email)
-    .fetch_one(&state.pool)
-    .await
-    .unwrap_or(false);
+    let exists_legacy: bool =
+        sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM \"__user\" WHERE email = $1)")
+            .bind(&body.email)
+            .fetch_one(&state.pool)
+            .await
+            .unwrap_or(false);
 
     if exists_tab || exists_legacy {
         return Err((
@@ -157,7 +159,9 @@ pub async fn signup(
 
     let password_hash = hash_password(&body.password);
     let full_name = body.full_name.as_deref().unwrap_or("");
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S%.6f").to_string();
+    let now = chrono::Utc::now()
+        .format("%Y-%m-%d %H:%M:%S%.6f")
+        .to_string();
 
     // Insert into User DocType table
     let insert_sql = format!(
@@ -166,19 +170,19 @@ pub async fn signup(
         user_table
     );
     sqlx::query(&insert_sql)
-    .bind(&body.email)
-    .bind(&body.email)
-    .bind(full_name)
-    .bind(&password_hash)
-    .bind(&now)
-    .execute(&state.pool)
-    .await
-    .map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": e.to_string()})),
-        )
-    })?;
+        .bind(&body.email)
+        .bind(&body.email)
+        .bind(full_name)
+        .bind(&password_hash)
+        .bind(&now)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
+            )
+        })?;
 
     Ok((
         StatusCode::CREATED,
@@ -199,8 +203,13 @@ async fn lookup_user(
         "SELECT id, email, full_name, password_hash, roles_json FROM \"{}\" WHERE id = $1 OR email = $1",
         user_table
     );
-    let row: Option<(String, Option<String>, Option<String>, Option<String>, Option<Value>)> =
-        sqlx::query_as(&select_sql)
+    let row: Option<(
+        String,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+        Option<Value>,
+    )> = sqlx::query_as(&select_sql)
         .bind(email)
         .fetch_optional(pool)
         .await
@@ -216,7 +225,10 @@ async fn lookup_user(
             .await
             .ok()
             .flatten();
-        let enabled = matches!(enabled_val.as_deref(), Some("true") | Some("t") | Some("1") | Some("yes"));
+        let enabled = matches!(
+            enabled_val.as_deref(),
+            Some("true") | Some("t") | Some("1") | Some("yes")
+        );
 
         let roles = roles_json.unwrap_or(json!(["All"]));
         // roles_json might be stored as a JSON string inside a text column
@@ -238,14 +250,12 @@ async fn lookup_user(
 
     let (email, password_hash, full_name, enabled) = row?;
 
-    let roles: Value = sqlx::query_scalar(
-        "SELECT roles FROM \"__user\" WHERE email = $1",
-    )
-    .bind(&email)
-    .fetch_one(pool)
-    .await
-    .ok()
-    .unwrap_or(json!(["All"]));
+    let roles: Value = sqlx::query_scalar("SELECT roles FROM \"__user\" WHERE email = $1")
+        .bind(&email)
+        .fetch_one(pool)
+        .await
+        .ok()
+        .unwrap_or(json!(["All"]));
 
     Some((email, password_hash, full_name, enabled, roles))
 }

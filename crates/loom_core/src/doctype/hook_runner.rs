@@ -38,7 +38,12 @@ impl RhaiHookRunner {
     }
 
     /// Build a fresh Rhai engine with the full loom API registered for the given context.
-    fn build_engine(pool: &PgPool, registry: &Arc<DocTypeRegistry>, user: &str, roles: &[String]) -> Engine {
+    fn build_engine(
+        pool: &PgPool,
+        registry: &Arc<DocTypeRegistry>,
+        user: &str,
+        roles: &[String],
+    ) -> Engine {
         let mut engine = crate::script::create_engine();
         crate::script::api::register_loom_api(&mut engine);
         crate::script::register_db_api(
@@ -75,11 +80,10 @@ impl RhaiHookRunner {
             return Ok(0);
         }
 
-        let rows: Vec<(String, String)> = sqlx::query_as(
-            "SELECT doctype, script FROM \"__script\"",
-        )
-        .fetch_all(pool)
-        .await?;
+        let rows: Vec<(String, String)> =
+            sqlx::query_as("SELECT doctype, script FROM \"__script\"")
+                .fetch_all(pool)
+                .await?;
 
         let count = rows.len();
         for (doctype, script) in rows {
@@ -110,9 +114,7 @@ impl RhaiHookRunner {
 }
 
 /// Recursively collect all `.rhai` scripts from a directory (sync filesystem walk).
-fn collect_rhai_scripts(
-    dir: &std::path::Path,
-) -> LoomResult<Vec<(String, String)>> {
+fn collect_rhai_scripts(dir: &std::path::Path) -> LoomResult<Vec<(String, String)>> {
     let mut results = Vec::new();
     let mut stack = vec![dir.to_path_buf()];
 
@@ -184,9 +186,7 @@ impl HookRunner for RhaiHookRunner {
             .map_err(|e| LoomError::Script(e))?;
 
         // Check if the function exists in the AST
-        let has_fn = ast
-            .iter_functions()
-            .any(|f| f.name == fn_name);
+        let has_fn = ast.iter_functions().any(|f| f.name == fn_name);
 
         if !has_fn {
             return Ok(()); // Function not defined, skip

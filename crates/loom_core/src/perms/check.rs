@@ -69,8 +69,17 @@ pub fn check_permission(
 
 /// Standard fields that are always visible regardless of permlevel.
 const ALWAYS_VISIBLE_FIELDS: &[&str] = &[
-    "id", "name", "owner", "creation", "modified", "modified_by", "docstatus",
-    "idx", "parent", "parentfield", "parenttype",
+    "id",
+    "name",
+    "owner",
+    "creation",
+    "modified",
+    "modified_by",
+    "docstatus",
+    "idx",
+    "parent",
+    "parentfield",
+    "parenttype",
 ];
 
 /// Compute which permlevels a user's roles grant for a given permission type.

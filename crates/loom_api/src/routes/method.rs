@@ -92,8 +92,7 @@ pub async fn call_method(
 
     match result {
         Ok(returned) => {
-            let result_val: Value =
-                rhai::serde::from_dynamic(&returned).unwrap_or(Value::Null);
+            let result_val: Value = rhai::serde::from_dynamic(&returned).unwrap_or(Value::Null);
             Ok(Json(json!({ "message": result_val })))
         }
         Err(e) => {

@@ -66,9 +66,15 @@ pub async fn insert(
     crud::apply_fetch_from(ctx.pool(), meta, doc).await?;
 
     // Pre-write hooks
-    hooks.run_hook(HookEvent::BeforeInsert, &meta.name, doc, ctx).await?;
-    hooks.run_hook(HookEvent::Validate, &meta.name, doc, ctx).await?;
-    hooks.run_hook(HookEvent::BeforeSave, &meta.name, doc, ctx).await?;
+    hooks
+        .run_hook(HookEvent::BeforeInsert, &meta.name, doc, ctx)
+        .await?;
+    hooks
+        .run_hook(HookEvent::Validate, &meta.name, doc, ctx)
+        .await?;
+    hooks
+        .run_hook(HookEvent::BeforeSave, &meta.name, doc, ctx)
+        .await?;
 
     // Validate Link fields + conditional mandatory fields
     crud::validate_link_fields(ctx.pool(), meta, doc).await?;
@@ -79,12 +85,28 @@ pub async fn insert(
 
     // Insert child table rows
     let mut result = result;
-    let parent_name = result.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
-    child::insert_children(ctx.pool(), meta, &parent_name, &mut result, &ctx.user, &ctx.registry).await?;
+    let parent_name = result
+        .get("id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    child::insert_children(
+        ctx.pool(),
+        meta,
+        &parent_name,
+        &mut result,
+        &ctx.user,
+        &ctx.registry,
+    )
+    .await?;
 
     // Post-write hooks (operate on a mutable copy)
-    hooks.run_hook(HookEvent::AfterInsert, &meta.name, &mut result, ctx).await?;
-    hooks.run_hook(HookEvent::AfterSave, &meta.name, &mut result, ctx).await?;
+    hooks
+        .run_hook(HookEvent::AfterInsert, &meta.name, &mut result, ctx)
+        .await?;
+    hooks
+        .run_hook(HookEvent::AfterSave, &meta.name, &mut result, ctx)
+        .await?;
 
     // Log activity
     let doc_name = result.get("id").and_then(|v| v.as_str()).unwrap_or("");
@@ -96,7 +118,10 @@ pub async fn insert(
         &ctx.user,
         &serde_json::json!({}),
     )
-    .await { tracing::warn!("Activity log failed: {}", e); }
+    .await
+    {
+        tracing::warn!("Activity log failed: {}", e);
+    }
 
     // Strip fields by read permlevel on response
     if !ctx.ignore_permissions() {
@@ -108,11 +133,7 @@ pub async fn insert(
 }
 
 /// Get a single document by name with permission check.
-pub async fn get(
-    ctx: &RequestContext,
-    meta: &Meta,
-    name: &str,
-) -> LoomResult<Value> {
+pub async fn get(ctx: &RequestContext, meta: &Meta, name: &str) -> LoomResult<Value> {
     let mut doc = crud::get_doc(ctx.pool(), meta, name).await?;
 
     if !ctx.ignore_permissions() {
@@ -144,8 +165,7 @@ pub async fn get_list(
     let effective_filters: Option<&Value>;
 
     if !ctx.ignore_permissions() {
-        let user_perms =
-            crate::perms::get_user_permissions(ctx.pool(), &ctx.user).await?;
+        let user_perms = crate::perms::get_user_permissions(ctx.pool(), &ctx.user).await?;
 
         if !user_perms.is_empty() {
             let (perm_clauses, _perm_values) =
@@ -181,16 +201,14 @@ pub async fn get_list(
                     let allowed: Vec<Value> = user_perms
                         .iter()
                         .filter(|p| {
-                            p.allow == perm.allow
-                                && p.applicable_for == perm.applicable_for
+                            p.allow == perm.allow && p.applicable_for == perm.applicable_for
                         })
                         .map(|p| Value::String(p.for_value.clone()))
                         .collect();
 
                     if perm.allow == meta.name {
                         // Filter on id
-                        all_filters
-                            .push(serde_json::json!(["id", "in", allowed]));
+                        all_filters.push(serde_json::json!(["id", "in", allowed]));
                     } else {
                         // Find Link fields pointing to the restricted DocType
                         for field in &meta.fields {
@@ -212,9 +230,7 @@ pub async fn get_list(
                 all_filters.retain(|f| {
                     if let Some(arr) = f.as_array() {
                         if arr.len() >= 2 {
-                            if let (Some(field), Some(op)) =
-                                (arr[0].as_str(), arr[1].as_str())
-                            {
+                            if let (Some(field), Some(op)) = (arr[0].as_str(), arr[1].as_str()) {
                                 if op == "in" {
                                     return seen_fields.insert(format!("{}:in", field));
                                 }
@@ -272,7 +288,13 @@ pub async fn update(
     let existing = crud::get_doc(ctx.pool(), meta, name).await?;
 
     if !ctx.ignore_permissions() {
-        check_permission(meta, Some(&existing), PermType::Write, &ctx.user, &ctx.roles)?;
+        check_permission(
+            meta,
+            Some(&existing),
+            PermType::Write,
+            &ctx.user,
+            &ctx.roles,
+        )?;
 
         // Check write permlevels on incoming fields
         let write_levels = allowed_permlevels(meta, PermType::Write, &ctx.roles);
@@ -304,8 +326,12 @@ pub async fn update(
     crud::apply_fetch_from(ctx.pool(), meta, doc).await?;
 
     // Pre-write hooks
-    hooks.run_hook(HookEvent::BeforeSave, &meta.name, doc, ctx).await?;
-    hooks.run_hook(HookEvent::Validate, &meta.name, doc, ctx).await?;
+    hooks
+        .run_hook(HookEvent::BeforeSave, &meta.name, doc, ctx)
+        .await?;
+    hooks
+        .run_hook(HookEvent::Validate, &meta.name, doc, ctx)
+        .await?;
 
     // Validate Link fields + conditional mandatory fields
     crud::validate_link_fields(ctx.pool(), meta, doc).await?;
@@ -319,8 +345,12 @@ pub async fn update(
     child::update_children(ctx.pool(), meta, name, doc, &ctx.user, &ctx.registry).await?;
 
     // Post-write hooks
-    hooks.run_hook(HookEvent::OnUpdate, &meta.name, &mut result, ctx).await?;
-    hooks.run_hook(HookEvent::AfterSave, &meta.name, &mut result, ctx).await?;
+    hooks
+        .run_hook(HookEvent::OnUpdate, &meta.name, &mut result, ctx)
+        .await?;
+    hooks
+        .run_hook(HookEvent::AfterSave, &meta.name, &mut result, ctx)
+        .await?;
 
     // Log activity with before/after values
     if let Err(e) = activity::log_activity(
@@ -331,7 +361,10 @@ pub async fn update(
         &ctx.user,
         &serde_json::json!({ "changed": changed_details }),
     )
-    .await { tracing::warn!("Activity log failed: {}", e); }
+    .await
+    {
+        tracing::warn!("Activity log failed: {}", e);
+    }
 
     // Strip fields by read permlevel on response
     if !ctx.ignore_permissions() {
@@ -352,12 +385,20 @@ pub async fn delete(
 ) -> LoomResult<()> {
     if !ctx.ignore_permissions() {
         let existing = crud::get_doc(ctx.pool(), meta, name).await?;
-        check_permission(meta, Some(&existing), PermType::Delete, &ctx.user, &ctx.roles)?;
+        check_permission(
+            meta,
+            Some(&existing),
+            PermType::Delete,
+            &ctx.user,
+            &ctx.roles,
+        )?;
     }
 
     // Pre-delete hook
     let mut doc = crud::get_doc(ctx.pool(), meta, name).await?;
-    hooks.run_hook(HookEvent::OnTrash, &meta.name, &mut doc, ctx).await?;
+    hooks
+        .run_hook(HookEvent::OnTrash, &meta.name, &mut doc, ctx)
+        .await?;
 
     // Delete child table rows first
     child::delete_children(ctx.pool(), meta, name, &ctx.registry).await?;
@@ -384,7 +425,13 @@ pub async fn submit(
     let existing = crud::get_doc(ctx.pool(), meta, name).await?;
 
     if !ctx.ignore_permissions() {
-        check_permission(meta, Some(&existing), PermType::Submit, &ctx.user, &ctx.roles)?;
+        check_permission(
+            meta,
+            Some(&existing),
+            PermType::Submit,
+            &ctx.user,
+            &ctx.roles,
+        )?;
     }
 
     let docstatus = existing
@@ -407,32 +454,40 @@ pub async fn submit(
                 .get("workflow_state")
                 .and_then(|v| v.as_str())
                 .unwrap_or_else(|| {
-                    workflow.initial_state().map(|s| s.state.as_str()).unwrap_or("")
+                    workflow
+                        .initial_state()
+                        .map(|s| s.state.as_str())
+                        .unwrap_or("")
                 });
-            let transition =
-                workflow.validate_transition(current_state, "Submit", &ctx.roles)?;
+            let transition = workflow.validate_transition(current_state, "Submit", &ctx.roles)?;
             next_workflow_state = Some(transition.next_state.clone());
         }
     }
 
     // Pre-submit hooks
     let mut doc = existing;
-    hooks.run_hook(HookEvent::BeforeSubmit, &meta.name, &mut doc, ctx).await?;
-    hooks.run_hook(HookEvent::Validate, &meta.name, &mut doc, ctx).await?;
+    hooks
+        .run_hook(HookEvent::BeforeSubmit, &meta.name, &mut doc, ctx)
+        .await?;
+    hooks
+        .run_hook(HookEvent::Validate, &meta.name, &mut doc, ctx)
+        .await?;
 
     // Set docstatus = 1, and workflow_state if applicable
     let mut update_doc = serde_json::json!({ "docstatus": 1 });
     if let Some(ref state) = next_workflow_state {
-        update_doc.as_object_mut().unwrap().insert(
-            "workflow_state".to_string(),
-            Value::String(state.clone()),
-        );
+        update_doc
+            .as_object_mut()
+            .unwrap()
+            .insert("workflow_state".to_string(), Value::String(state.clone()));
     }
     let result = crud::update_doc(ctx.pool(), meta, name, &mut update_doc, &ctx.user).await?;
 
     // Post-submit hook
     let mut result = result;
-    hooks.run_hook(HookEvent::OnSubmit, &meta.name, &mut result, ctx).await?;
+    hooks
+        .run_hook(HookEvent::OnSubmit, &meta.name, &mut result, ctx)
+        .await?;
 
     // Log activity
     if let Err(e) = activity::log_activity(
@@ -443,7 +498,10 @@ pub async fn submit(
         &ctx.user,
         &serde_json::json!({}),
     )
-    .await { tracing::warn!("Activity log failed: {}", e); }
+    .await
+    {
+        tracing::warn!("Activity log failed: {}", e);
+    }
 
     // Strip fields by read permlevel on response
     if !ctx.ignore_permissions() {
@@ -472,7 +530,13 @@ pub async fn cancel(
     let existing = crud::get_doc(ctx.pool(), meta, name).await?;
 
     if !ctx.ignore_permissions() {
-        check_permission(meta, Some(&existing), PermType::Cancel, &ctx.user, &ctx.roles)?;
+        check_permission(
+            meta,
+            Some(&existing),
+            PermType::Cancel,
+            &ctx.user,
+            &ctx.roles,
+        )?;
     }
 
     let docstatus = existing
@@ -495,29 +559,32 @@ pub async fn cancel(
                 .get("workflow_state")
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
-            let transition =
-                workflow.validate_transition(current_state, "Cancel", &ctx.roles)?;
+            let transition = workflow.validate_transition(current_state, "Cancel", &ctx.roles)?;
             next_workflow_state = Some(transition.next_state.clone());
         }
     }
 
     // Pre-cancel hook
     let mut doc = existing;
-    hooks.run_hook(HookEvent::BeforeCancel, &meta.name, &mut doc, ctx).await?;
+    hooks
+        .run_hook(HookEvent::BeforeCancel, &meta.name, &mut doc, ctx)
+        .await?;
 
     // Set docstatus = 2, and workflow_state if applicable
     let mut update_doc = serde_json::json!({ "docstatus": 2 });
     if let Some(ref state) = next_workflow_state {
-        update_doc.as_object_mut().unwrap().insert(
-            "workflow_state".to_string(),
-            Value::String(state.clone()),
-        );
+        update_doc
+            .as_object_mut()
+            .unwrap()
+            .insert("workflow_state".to_string(), Value::String(state.clone()));
     }
     let result = crud::update_doc(ctx.pool(), meta, name, &mut update_doc, &ctx.user).await?;
 
     // Post-cancel hook
     let mut result = result;
-    hooks.run_hook(HookEvent::OnCancel, &meta.name, &mut result, ctx).await?;
+    hooks
+        .run_hook(HookEvent::OnCancel, &meta.name, &mut result, ctx)
+        .await?;
 
     // Log activity
     if let Err(e) = activity::log_activity(
@@ -528,7 +595,10 @@ pub async fn cancel(
         &ctx.user,
         &serde_json::json!({}),
     )
-    .await { tracing::warn!("Activity log failed: {}", e); }
+    .await
+    {
+        tracing::warn!("Activity log failed: {}", e);
+    }
 
     // Strip fields by read permlevel on response
     if !ctx.ignore_permissions() {

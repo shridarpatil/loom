@@ -86,8 +86,21 @@ fn test_merge_permissions_adds_new_rule() {
 #[test]
 fn test_merge_permissions_preserves_untouched_defaults() {
     let defaults = vec![
-        DocPermMeta { role: "All".into(), permlevel: 0, read: true, write: true, ..DocPermMeta::default() },
-        DocPermMeta { role: "Admin".into(), permlevel: 0, read: true, write: true, create: true, ..DocPermMeta::default() },
+        DocPermMeta {
+            role: "All".into(),
+            permlevel: 0,
+            read: true,
+            write: true,
+            ..DocPermMeta::default()
+        },
+        DocPermMeta {
+            role: "Admin".into(),
+            permlevel: 0,
+            read: true,
+            write: true,
+            create: true,
+            ..DocPermMeta::default()
+        },
     ];
     let overrides = vec![DocPermMeta {
         role: "All".into(),

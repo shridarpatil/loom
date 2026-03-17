@@ -3,14 +3,13 @@
 use sqlx::PgPool;
 use std::path::Path;
 
-use loom_core::doctype::{DocTypeRegistry, Meta, crud};
-use loom_core::db::migrate::{migrate_all, migrate_system_tables, migrate_doctype, seed_admin_to_doctype_table};
+use loom_core::db::migrate::{
+    migrate_all, migrate_doctype, migrate_system_tables, seed_admin_to_doctype_table,
+};
+use loom_core::doctype::{crud, DocTypeRegistry, Meta};
 
 /// Run full migration: system tables, DocTypes, seeds, app configs, scripts.
-pub async fn run_full_migrate(
-    pool: &PgPool,
-    apps_dir: &Path,
-) -> anyhow::Result<()> {
+pub async fn run_full_migrate(pool: &PgPool, apps_dir: &Path) -> anyhow::Result<()> {
     // System tables
     migrate_system_tables(pool).await?;
     tracing::info!("System tables ready");
@@ -78,20 +77,21 @@ pub async fn run_full_migrate(
 }
 
 /// Load fixture files from an app's fixtures/ directory.
-pub async fn load_fixtures(
-    pool: &PgPool,
-    apps_dir: &Path,
-) -> anyhow::Result<usize> {
+pub async fn load_fixtures(pool: &PgPool, apps_dir: &Path) -> anyhow::Result<usize> {
     let registry = DocTypeRegistry::new();
     registry.load_from_database(pool).await?;
 
     let mut total = 0;
-    if !apps_dir.exists() { return Ok(0); }
+    if !apps_dir.exists() {
+        return Ok(0);
+    }
 
     let entries = std::fs::read_dir(apps_dir)?;
     for entry in entries.flatten() {
         let fixtures_dir = entry.path().join("fixtures");
-        if !fixtures_dir.exists() { continue; }
+        if !fixtures_dir.exists() {
+            continue;
+        }
 
         let dir_entries = std::fs::read_dir(&fixtures_dir)?;
         for de in dir_entries.flatten() {
@@ -106,7 +106,8 @@ pub async fn load_fixtures(
                     }
                 };
 
-                let doctype_name = path.file_stem()
+                let doctype_name = path
+                    .file_stem()
                     .and_then(|s| s.to_str())
                     .unwrap_or("")
                     .replace('_', " ");
@@ -145,15 +146,16 @@ pub async fn load_fixtures(
 
 /// Re-read loom_app.toml + hooks.toml from all apps and update installed_apps config.
 pub async fn refresh_app_configs(pool: &PgPool, apps_dir: &Path) -> anyhow::Result<()> {
-    if !apps_dir.exists() { return Ok(()); }
+    if !apps_dir.exists() {
+        return Ok(());
+    }
 
     // Keep system app, refresh everything else
-    let existing: serde_json::Value = sqlx::query_scalar(
-        "SELECT value FROM \"__site_config\" WHERE key = 'installed_apps'",
-    )
-    .fetch_optional(pool)
-    .await?
-    .unwrap_or(serde_json::json!([]));
+    let existing: serde_json::Value =
+        sqlx::query_scalar("SELECT value FROM \"__site_config\" WHERE key = 'installed_apps'")
+            .fetch_optional(pool)
+            .await?
+            .unwrap_or(serde_json::json!([]));
 
     let mut apps: Vec<serde_json::Value> = existing
         .as_array()
@@ -166,10 +168,14 @@ pub async fn refresh_app_configs(pool: &PgPool, apps_dir: &Path) -> anyhow::Resu
     let entries = std::fs::read_dir(apps_dir)?;
     for entry in entries.flatten() {
         let path = entry.path();
-        if !path.is_dir() { continue; }
+        if !path.is_dir() {
+            continue;
+        }
 
         let toml_path = path.join("loom_app.toml");
-        if !toml_path.exists() { continue; }
+        if !toml_path.exists() {
+            continue;
+        }
 
         let content = std::fs::read_to_string(&toml_path)?;
         let parsed: toml::Value = content.parse()?;
@@ -178,16 +184,38 @@ pub async fn refresh_app_configs(pool: &PgPool, apps_dir: &Path) -> anyhow::Resu
             None => continue,
         };
 
-        let name = app_section.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
-        if name.is_empty() { continue; }
+        let name = app_section
+            .get("name")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        if name.is_empty() {
+            continue;
+        }
 
         let hooks_path = path.join("hooks.toml");
         let (workspace, dashboard) = if hooks_path.exists() {
             let hooks_content = std::fs::read_to_string(&hooks_path).unwrap_or_default();
-            let hooks: toml::Value = hooks_content.parse().unwrap_or(toml::Value::Table(Default::default()));
+            let hooks: toml::Value = hooks_content
+                .parse()
+                .unwrap_or(toml::Value::Table(Default::default()));
             (
                 parse_toml_array(&hooks, "workspace", &["label", "route", "icon"]),
-                parse_toml_array(&hooks, "dashboard", &["type", "label", "doctype", "route", "color", "chart_type", "field", "span", "direction"]),
+                parse_toml_array(
+                    &hooks,
+                    "dashboard",
+                    &[
+                        "type",
+                        "label",
+                        "doctype",
+                        "route",
+                        "color",
+                        "chart_type",
+                        "field",
+                        "span",
+                        "direction",
+                    ],
+                ),
             )
         } else {
             (vec![], vec![])
@@ -219,12 +247,16 @@ pub async fn refresh_app_configs(pool: &PgPool, apps_dir: &Path) -> anyhow::Resu
 
 /// Reload Rhai scripts from all apps.
 pub async fn reload_scripts(pool: &PgPool, apps_dir: &Path) -> anyhow::Result<()> {
-    if !apps_dir.exists() { return Ok(()); }
+    if !apps_dir.exists() {
+        return Ok(());
+    }
 
     let entries = std::fs::read_dir(apps_dir)?;
     for entry in entries.flatten() {
         let doctypes_dir = entry.path().join("doctypes");
-        if !doctypes_dir.exists() { continue; }
+        if !doctypes_dir.exists() {
+            continue;
+        }
 
         let mut stack = vec![doctypes_dir];
         while let Some(current) = stack.pop() {
@@ -234,8 +266,14 @@ pub async fn reload_scripts(pool: &PgPool, apps_dir: &Path) -> anyhow::Result<()
                 if path.is_dir() {
                     stack.push(path);
                 } else if path.extension().is_some_and(|ext| ext == "rhai") {
-                    let slug = path.file_stem().and_then(|s| s.to_str()).unwrap_or("").to_string();
-                    if slug.is_empty() { continue; }
+                    let slug = path
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("")
+                        .to_string();
+                    if slug.is_empty() {
+                        continue;
+                    }
                     let source = std::fs::read_to_string(&path)?;
                     sqlx::query(
                         "INSERT INTO \"__script\" (name, doctype, script, modified) \
@@ -253,12 +291,16 @@ pub async fn reload_scripts(pool: &PgPool, apps_dir: &Path) -> anyhow::Result<()
 
 /// Reload client scripts (.client.js) from all apps.
 pub async fn reload_client_scripts(pool: &PgPool, apps_dir: &Path) -> anyhow::Result<()> {
-    if !apps_dir.exists() { return Ok(()); }
+    if !apps_dir.exists() {
+        return Ok(());
+    }
 
     let entries = std::fs::read_dir(apps_dir)?;
     for entry in entries.flatten() {
         let doctypes_dir = entry.path().join("doctypes");
-        if !doctypes_dir.exists() { continue; }
+        if !doctypes_dir.exists() {
+            continue;
+        }
 
         let mut stack = vec![doctypes_dir];
         while let Some(current) = stack.pop() {
@@ -268,17 +310,26 @@ pub async fn reload_client_scripts(pool: &PgPool, apps_dir: &Path) -> anyhow::Re
                 if path.is_dir() {
                     stack.push(path);
                 } else if path.to_string_lossy().ends_with(".client.js") {
-                    let slug = path.file_name()
+                    let slug = path
+                        .file_name()
                         .and_then(|s| s.to_str())
                         .and_then(|s| s.strip_suffix(".client.js"))
-                        .unwrap_or("").to_string();
-                    if slug.is_empty() { continue; }
+                        .unwrap_or("")
+                        .to_string();
+                    if slug.is_empty() {
+                        continue;
+                    }
 
                     let json_path = path.parent().unwrap().join(format!("{}.json", slug));
                     let doctype_name = if json_path.exists() {
-                        std::fs::read_to_string(&json_path).ok()
+                        std::fs::read_to_string(&json_path)
+                            .ok()
                             .and_then(|c| serde_json::from_str::<serde_json::Value>(&c).ok())
-                            .and_then(|v| v.get("name").and_then(|n| n.as_str()).map(|s| s.to_string()))
+                            .and_then(|v| {
+                                v.get("name")
+                                    .and_then(|n| n.as_str())
+                                    .map(|s| s.to_string())
+                            })
                             .unwrap_or(slug.clone())
                     } else {
                         slug.clone()
@@ -300,21 +351,28 @@ pub async fn reload_client_scripts(pool: &PgPool, apps_dir: &Path) -> anyhow::Re
 }
 
 fn parse_toml_array(hooks: &toml::Value, key: &str, fields: &[&str]) -> Vec<serde_json::Value> {
-    hooks.get(key)
+    hooks
+        .get(key)
         .and_then(|v| v.as_array())
         .map(|arr| {
-            arr.iter().filter_map(|item| {
-                let table = item.as_table()?;
-                let mut obj = serde_json::Map::new();
-                for &field in fields {
-                    if let Some(val) = table.get(field) {
-                        if let Some(s) = val.as_str() {
-                            obj.insert(field.to_string(), serde_json::json!(s));
+            arr.iter()
+                .filter_map(|item| {
+                    let table = item.as_table()?;
+                    let mut obj = serde_json::Map::new();
+                    for &field in fields {
+                        if let Some(val) = table.get(field) {
+                            if let Some(s) = val.as_str() {
+                                obj.insert(field.to_string(), serde_json::json!(s));
+                            }
                         }
                     }
-                }
-                if obj.is_empty() { None } else { Some(serde_json::Value::Object(obj)) }
-            }).collect()
+                    if obj.is_empty() {
+                        None
+                    } else {
+                        Some(serde_json::Value::Object(obj))
+                    }
+                })
+                .collect()
         })
         .unwrap_or_default()
 }

@@ -14,7 +14,7 @@ pub async fn get_setting(
     Path(key): Path<String>,
 ) -> impl IntoResponse {
     let result = sqlx::query_scalar::<_, serde_json::Value>(
-        "SELECT value FROM \"__user_settings\" WHERE user_email = $1 AND key = $2"
+        "SELECT value FROM \"__user_settings\" WHERE user_email = $1 AND key = $2",
     )
     .bind(&ctx.user)
     .bind(&key)
@@ -26,9 +26,13 @@ pub async fn get_setting(
         Ok(None) => Json(serde_json::json!({ "data": null })).into_response(),
         Err(e) => {
             tracing::error!("Failed to read setting: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({
-                "error": "Failed to read setting"
-            }))).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({
+                    "error": "Failed to read setting"
+                })),
+            )
+                .into_response()
         }
     }
 }
@@ -43,7 +47,7 @@ pub async fn save_setting(
     let result = sqlx::query(
         "INSERT INTO \"__user_settings\" (user_email, key, value, modified)
          VALUES ($1, $2, $3, NOW())
-         ON CONFLICT (user_email, key) DO UPDATE SET value = $3, modified = NOW()"
+         ON CONFLICT (user_email, key) DO UPDATE SET value = $3, modified = NOW()",
     )
     .bind(&ctx.user)
     .bind(&key)
@@ -55,9 +59,13 @@ pub async fn save_setting(
         Ok(_) => Json(serde_json::json!({ "message": "Setting saved" })).into_response(),
         Err(e) => {
             tracing::error!("Failed to save setting: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({
-                "error": "Failed to save setting"
-            }))).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({
+                    "error": "Failed to save setting"
+                })),
+            )
+                .into_response()
         }
     }
 }
@@ -76,12 +84,19 @@ pub async fn get_sidebar(
 
     for dt_name in &doctypes {
         if let Ok(meta) = state.registry.get_meta(dt_name).await {
-            let module = if meta.module.is_empty() { "Core".to_string() } else { meta.module.clone() };
-            module_map.entry(module.clone()).or_default().push(serde_json::json!({
-                "name": dt_name,
-                "route": format!("/app/{}", dt_name),
-                "module": module,
-            }));
+            let module = if meta.module.is_empty() {
+                "Core".to_string()
+            } else {
+                meta.module.clone()
+            };
+            module_map
+                .entry(module.clone())
+                .or_default()
+                .push(serde_json::json!({
+                    "name": dt_name,
+                    "route": format!("/app/{}", dt_name),
+                    "module": module,
+                }));
         }
     }
 
@@ -97,7 +112,7 @@ pub async fn get_sidebar(
 
     // 2. Load user sidebar overrides
     let user_sidebar = sqlx::query_scalar::<_, serde_json::Value>(
-        "SELECT value FROM \"__user_settings\" WHERE user_email = $1 AND key = 'sidebar'"
+        "SELECT value FROM \"__user_settings\" WHERE user_email = $1 AND key = 'sidebar'",
     )
     .bind(&ctx.user)
     .fetch_optional(&state.pool)
@@ -127,9 +142,7 @@ pub async fn get_sidebar(
 }
 
 /// GET /api/plugins/pages — returns registered plugin pages from app hooks
-pub async fn get_plugin_pages(
-    State(_state): State<AppState>,
-) -> impl IntoResponse {
+pub async fn get_plugin_pages(State(_state): State<AppState>) -> impl IntoResponse {
     let mut pages: Vec<serde_json::Value> = Vec::new();
 
     // Scan apps/*/hooks.toml for [[pages]]

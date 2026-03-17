@@ -33,13 +33,15 @@ pub async fn get_user_permissions(pool: &PgPool, user: &str) -> LoomResult<Vec<U
 
     Ok(rows
         .into_iter()
-        .map(|(user, allow, for_value, applicable_for, is_default)| UserPermission {
-            user,
-            allow,
-            for_value,
-            applicable_for,
-            is_default,
-        })
+        .map(
+            |(user, allow, for_value, applicable_for, is_default)| UserPermission {
+                user,
+                allow,
+                for_value,
+                applicable_for,
+                is_default,
+            },
+        )
         .collect())
 }
 

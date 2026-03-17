@@ -8,8 +8,16 @@ fn make_meta(rule: NamingRule, autoname: Option<&str>) -> Meta {
         naming_rule: rule,
         autoname: autoname.map(|s| s.to_string()),
         fields: vec![
-            DocFieldMeta { fieldname: "title".into(), fieldtype: FieldType::Data, ..DocFieldMeta::default() },
-            DocFieldMeta { fieldname: "code".into(), fieldtype: FieldType::Data, ..DocFieldMeta::default() },
+            DocFieldMeta {
+                fieldname: "title".into(),
+                fieldtype: FieldType::Data,
+                ..DocFieldMeta::default()
+            },
+            DocFieldMeta {
+                fieldname: "code".into(),
+                fieldtype: FieldType::Data,
+                ..DocFieldMeta::default()
+            },
         ],
         ..Meta::default()
     }

@@ -1,8 +1,8 @@
 use serde_json::{json, Value};
 use sqlx::PgPool;
 
-use crate::error::{LoomError, LoomResult};
 use super::meta::{FieldType, Meta};
+use crate::error::{LoomError, LoomResult};
 
 /// Set parent metadata on child rows and ensure idx ordering.
 pub fn prepare_child_rows(
@@ -76,10 +76,22 @@ pub async fn insert_children(
             insert_child_row(pool, &table, &child_meta, row).await?;
 
             // Recurse: insert grandchildren if this child has Table fields
-            let child_id = row.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let child_id = row
+                .get("id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
             if !child_id.is_empty() && has_table_fields(&child_meta) {
                 // Use Box::pin for recursive async
-                Box::pin(insert_children(pool, &child_meta, &child_id, row, user, registry)).await?;
+                Box::pin(insert_children(
+                    pool,
+                    &child_meta,
+                    &child_id,
+                    row,
+                    user,
+                    registry,
+                ))
+                .await?;
             }
         }
 
@@ -109,7 +121,10 @@ pub async fn update_children(
             _ => continue,
         };
 
-        if !doc.as_object().map_or(false, |o| o.contains_key(&field.fieldname)) {
+        if !doc
+            .as_object()
+            .map_or(false, |o| o.contains_key(&field.fieldname))
+        {
             continue;
         }
 
@@ -121,7 +136,14 @@ pub async fn update_children(
         };
 
         // Delete existing children (recurse into grandchildren first)
-        Box::pin(delete_children_for_field(pool, &child_meta, parent_name, &field.fieldname, registry)).await?;
+        Box::pin(delete_children_for_field(
+            pool,
+            &child_meta,
+            parent_name,
+            &field.fieldname,
+            registry,
+        ))
+        .await?;
 
         if rows.is_empty() {
             continue;
@@ -136,9 +158,21 @@ pub async fn update_children(
             insert_child_row(pool, &table, &child_meta, row).await?;
 
             // Recurse: insert grandchildren
-            let child_id = row.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let child_id = row
+                .get("id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
             if !child_id.is_empty() && has_table_fields(&child_meta) {
-                Box::pin(insert_children(pool, &child_meta, &child_id, row, user, registry)).await?;
+                Box::pin(insert_children(
+                    pool,
+                    &child_meta,
+                    &child_id,
+                    row,
+                    user,
+                    registry,
+                ))
+                .await?;
             }
         }
 
@@ -174,14 +208,12 @@ pub async fn delete_children(
         // If the child itself has Table fields, find child IDs and recurse first
         if has_table_fields(&child_meta) {
             let table = child_meta.table_name();
-            let ids: Vec<String> = sqlx::query_scalar(&format!(
-                "SELECT id FROM \"{}\" WHERE parent = $1",
-                table
-            ))
-            .bind(parent_name)
-            .fetch_all(pool)
-            .await
-            .unwrap_or_default();
+            let ids: Vec<String> =
+                sqlx::query_scalar(&format!("SELECT id FROM \"{}\" WHERE parent = $1", table))
+                    .bind(parent_name)
+                    .fetch_all(pool)
+                    .await
+                    .unwrap_or_default();
 
             for child_id in &ids {
                 Box::pin(delete_children(pool, &child_meta, child_id, registry)).await?;
@@ -191,11 +223,7 @@ pub async fn delete_children(
         // Now delete the direct children
         let table = child_meta.table_name();
         let sql = format!("DELETE FROM \"{}\" WHERE parent = $1", table);
-        sqlx::query(&sql)
-            .bind(parent_name)
-            .execute(pool)
-            .await
-            .ok();
+        sqlx::query(&sql).bind(parent_name).execute(pool).await.ok();
     }
     Ok(())
 }
@@ -251,7 +279,12 @@ use super::meta::set_standard_fields_on_insert as set_standard_fields;
 
 fn generate_child_id(row: &mut Value, _parent_name: &str, _fieldname: &str) {
     if let Some(obj) = row.as_object_mut() {
-        if obj.get("id").and_then(|v| v.as_str()).unwrap_or("").is_empty() {
+        if obj
+            .get("id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .is_empty()
+        {
             let id = uuid::Uuid::new_v4().to_string().replace('-', "")[..10].to_string();
             obj.insert("id".to_string(), json!(id));
         }

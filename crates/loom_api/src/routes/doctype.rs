@@ -6,8 +6,8 @@ use axum::{
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use crate::server::AppState;
 use super::customize::apply_customization;
+use crate::server::AppState;
 
 /// GET /api/doctype/:name — return DocType meta JSON with customizations applied
 pub async fn get_meta(
@@ -48,7 +48,9 @@ pub async fn export_meta(
     if !is_developer_mode() {
         return Err((
             StatusCode::FORBIDDEN,
-            Json(json!({"error": "Export is only available in developer mode. Set developer_mode in site config."})),
+            Json(
+                json!({"error": "Export is only available in developer mode. Set developer_mode in site config."}),
+            ),
         ));
     }
 
@@ -76,7 +78,9 @@ pub async fn export_meta(
         if !app_path.is_dir() {
             return Err((
                 StatusCode::BAD_REQUEST,
-                Json(json!({"error": format!("App '{}' not found in {}", app, apps_dir.display())})),
+                Json(
+                    json!({"error": format!("App '{}' not found in {}", app, apps_dir.display())}),
+                ),
             ));
         }
         app
@@ -125,17 +129,14 @@ pub async fn export_meta(
 }
 
 /// GET /api/apps — list installed apps with metadata (icon, color, modules)
-pub async fn list_apps_handler(
-    State(state): State<AppState>,
-) -> Json<Value> {
+pub async fn list_apps_handler(State(state): State<AppState>) -> Json<Value> {
     // Try to get rich metadata from __site_config
-    let installed: Option<Value> = sqlx::query_scalar(
-        "SELECT value FROM \"__site_config\" WHERE key = 'installed_apps'",
-    )
-    .fetch_optional(&state.pool)
-    .await
-    .ok()
-    .flatten();
+    let installed: Option<Value> =
+        sqlx::query_scalar("SELECT value FROM \"__site_config\" WHERE key = 'installed_apps'")
+            .fetch_optional(&state.pool)
+            .await
+            .ok()
+            .flatten();
 
     if let Some(apps) = installed {
         return Json(json!({ "data": apps }));
@@ -146,7 +147,9 @@ pub async fn list_apps_handler(
     let mut apps: Vec<Value> = Vec::new();
     if let Ok(entries) = std::fs::read_dir(&apps_dir) {
         for entry in entries.flatten() {
-            if !entry.path().is_dir() { continue; }
+            if !entry.path().is_dir() {
+                continue;
+            }
             let toml_path = entry.path().join("loom_app.toml");
             if let Ok(content) = std::fs::read_to_string(&toml_path) {
                 if let Ok(parsed) = content.parse::<toml::Value>() {
@@ -237,7 +240,9 @@ pub fn is_developer_mode() -> bool {
                     if let Ok(config) = serde_json::from_str::<serde_json::Value>(&content) {
                         match config.get("developer_mode") {
                             Some(serde_json::Value::Bool(true)) => return true,
-                            Some(serde_json::Value::Number(n)) if n.as_i64() == Some(1) => return true,
+                            Some(serde_json::Value::Number(n)) if n.as_i64() == Some(1) => {
+                                return true
+                            }
                             _ => {}
                         }
                     }
@@ -282,15 +287,14 @@ pub fn auto_export_doctype(meta: &loom_core::doctype::Meta) {
 
     // App DocTypes → apps/{app}/doctypes/
     let apps_dir = find_apps_dir();
-    let app_name = find_app_for_doctype(&apps_dir, &slug)
-        .or_else(|| {
-            let module_slug = meta.module.to_lowercase().replace(' ', "_");
-            if apps_dir.join(&module_slug).is_dir() {
-                Some(module_slug)
-            } else {
-                find_single_app(&apps_dir)
-            }
-        });
+    let app_name = find_app_for_doctype(&apps_dir, &slug).or_else(|| {
+        let module_slug = meta.module.to_lowercase().replace(' ', "_");
+        if apps_dir.join(&module_slug).is_dir() {
+            Some(module_slug)
+        } else {
+            find_single_app(&apps_dir)
+        }
+    });
 
     let app_name = match app_name {
         Some(a) => a,
@@ -299,7 +303,10 @@ pub fn auto_export_doctype(meta: &loom_core::doctype::Meta) {
 
     let dir_path = apps_dir.join(&app_name).join("doctypes").join(&slug);
     if std::fs::create_dir_all(&dir_path).is_err() {
-        tracing::warn!("Failed to create directory for DocType export: {:?}", dir_path);
+        tracing::warn!(
+            "Failed to create directory for DocType export: {:?}",
+            dir_path
+        );
         return;
     }
     write_doctype_json(&dir_path, &slug, meta);
@@ -329,5 +336,7 @@ fn find_core_doctypes_dir() -> std::path::PathBuf {
             break;
         }
     }
-    std::env::current_dir().unwrap_or_default().join("core_doctypes")
+    std::env::current_dir()
+        .unwrap_or_default()
+        .join("core_doctypes")
 }

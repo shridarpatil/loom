@@ -23,16 +23,12 @@ pub async fn upload_file(
 
     let mut uploaded = Vec::new();
 
-    while let Some(field) = multipart
-        .next_field()
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::BAD_REQUEST,
-                Json(json!({"error": format!("Multipart error: {}", e)})),
-            )
-        })?
-    {
+    while let Some(field) = multipart.next_field().await.map_err(|e| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": format!("Multipart error: {}", e)})),
+        )
+    })? {
         let file_name = field
             .file_name()
             .map(|s| s.to_string())
@@ -62,7 +58,12 @@ pub async fn upload_file(
         })?;
 
         let url = format!("/uploads/{}", unique_name);
-        tracing::info!("File uploaded by {}: {} ({} bytes)", ctx.user, url, data.len());
+        tracing::info!(
+            "File uploaded by {}: {} ({} bytes)",
+            ctx.user,
+            url,
+            data.len()
+        );
 
         uploaded.push(json!({
             "file_name": safe_name,
@@ -86,7 +87,13 @@ pub async fn upload_file(
 
 fn sanitize_filename(name: &str) -> String {
     name.chars()
-        .map(|c| if c.is_alphanumeric() || c == '.' || c == '-' || c == '_' { c } else { '_' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '.' || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect()
 }
 

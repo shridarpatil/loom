@@ -1,5 +1,5 @@
-use clap::Args;
 use crate::site_config::resolve_db_url;
+use clap::Args;
 
 #[derive(Debug, Args)]
 pub struct MigrateArgs {

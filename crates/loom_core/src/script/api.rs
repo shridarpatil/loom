@@ -7,9 +7,10 @@ use rhai::{Dynamic, Engine};
 /// Available in scripts as: throw(msg), today(), now(), log(msg), msgprint(msg), date_diff(d1, d2)
 pub fn register_loom_api(engine: &mut Engine) {
     // throw(msg) — raise a validation error
-    engine.register_fn("throw", |msg: &str| -> Result<(), Box<rhai::EvalAltResult>> {
-        Err(msg.into())
-    });
+    engine.register_fn(
+        "throw",
+        |msg: &str| -> Result<(), Box<rhai::EvalAltResult>> { Err(msg.into()) },
+    );
 
     // msgprint(msg) — flash message (logged server-side)
     engine.register_fn("msgprint", |msg: &str| {
@@ -27,9 +28,7 @@ pub fn register_loom_api(engine: &mut Engine) {
     });
 
     // now() — current datetime as ISO string
-    engine.register_fn("now", || -> String {
-        chrono::Utc::now().to_rfc3339()
-    });
+    engine.register_fn("now", || -> String { chrono::Utc::now().to_rfc3339() });
 
     // date_diff(date1, date2) — days between two date strings
     engine.register_fn("date_diff", |date1: &str, date2: &str| -> Dynamic {

@@ -15,11 +15,7 @@ use crate::server::AppState;
 
 /// Inject a `RequestContext` into the request extensions based on auth.
 /// Uses session cache to avoid DB queries on every request.
-pub async fn inject_context(
-    state: AppState,
-    mut request: Request,
-    next: Next,
-) -> Response {
+pub async fn inject_context(state: AppState, mut request: Request, next: Next) -> Response {
     let auth_header = request
         .headers()
         .get("authorization")
@@ -139,14 +135,13 @@ async fn check_user_enabled(pool: &PgPool, email: &str) -> bool {
     }
 
     // Fallback to __user
-    let result: Option<bool> = sqlx::query_scalar(
-        "SELECT enabled FROM \"__user\" WHERE email = $1",
-    )
-    .bind(email)
-    .fetch_optional(pool)
-    .await
-    .ok()
-    .flatten();
+    let result: Option<bool> =
+        sqlx::query_scalar("SELECT enabled FROM \"__user\" WHERE email = $1")
+            .bind(email)
+            .fetch_optional(pool)
+            .await
+            .ok()
+            .flatten();
 
     result.unwrap_or(false)
 }
@@ -154,7 +149,10 @@ async fn check_user_enabled(pool: &PgPool, email: &str) -> bool {
 /// Get roles for a user. Tries User DocType table first, falls back to __user (legacy).
 async fn get_user_roles(pool: &PgPool, email: &str) -> Vec<String> {
     let user_table = loom_core::doctype::doctype_table_name("User");
-    let sql = format!("SELECT roles_json FROM \"{}\" WHERE id = $1 AND enabled = true", user_table);
+    let sql = format!(
+        "SELECT roles_json FROM \"{}\" WHERE id = $1 AND enabled = true",
+        user_table
+    );
     let roles_json: Option<Value> = sqlx::query_scalar(&sql)
         .bind(email)
         .fetch_optional(pool)
@@ -167,14 +165,13 @@ async fn get_user_roles(pool: &PgPool, email: &str) -> Vec<String> {
     }
 
     // Fallback to __user (legacy)
-    let roles_json: Option<Value> = sqlx::query_scalar(
-        "SELECT roles FROM \"__user\" WHERE email = $1 AND enabled = TRUE",
-    )
-    .bind(email)
-    .fetch_optional(pool)
-    .await
-    .ok()
-    .flatten();
+    let roles_json: Option<Value> =
+        sqlx::query_scalar("SELECT roles FROM \"__user\" WHERE email = $1 AND enabled = TRUE")
+            .bind(email)
+            .fetch_optional(pool)
+            .await
+            .ok()
+            .flatten();
 
     parse_roles_json(&roles_json.unwrap_or(Value::Null))
 }

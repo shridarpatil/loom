@@ -1,4 +1,4 @@
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 use sqlx::PgPool;
 
 use crate::doctype::meta::{Meta, STANDARD_FIELDS};
@@ -42,9 +42,7 @@ pub async fn migrate_system_tables(pool: &PgPool) -> LoomResult<()> {
     )
     .execute(pool)
     .await
-    .map_err(|e| {
-        LoomError::Internal(format!("Failed to create __naming_series table: {}", e))
-    })?;
+    .map_err(|e| LoomError::Internal(format!("Failed to create __naming_series table: {}", e)))?;
 
     // __script: stores Rhai scripts for DocTypes
     sqlx::query(
@@ -69,9 +67,7 @@ pub async fn migrate_system_tables(pool: &PgPool) -> LoomResult<()> {
     )
     .execute(pool)
     .await
-    .map_err(|e| {
-        LoomError::Internal(format!("Failed to create __user_api_key table: {}", e))
-    })?;
+    .map_err(|e| LoomError::Internal(format!("Failed to create __user_api_key table: {}", e)))?;
 
     // __customization: per-site DocType customizations (field overrides + client scripts)
     sqlx::query(
@@ -84,9 +80,7 @@ pub async fn migrate_system_tables(pool: &PgPool) -> LoomResult<()> {
     )
     .execute(pool)
     .await
-    .map_err(|e| {
-        LoomError::Internal(format!("Failed to create __customization table: {}", e))
-    })?;
+    .map_err(|e| LoomError::Internal(format!("Failed to create __customization table: {}", e)))?;
 
     // __user: stores user accounts
     sqlx::query(
@@ -127,9 +121,7 @@ pub async fn migrate_system_tables(pool: &PgPool) -> LoomResult<()> {
     )
     .execute(pool)
     .await
-    .map_err(|e| {
-        LoomError::Internal(format!("Failed to create __site_config table: {}", e))
-    })?;
+    .map_err(|e| LoomError::Internal(format!("Failed to create __site_config table: {}", e)))?;
 
     // __user_settings: stores per-user settings (sidebar, list views, etc.)
     sqlx::query(
@@ -143,9 +135,7 @@ pub async fn migrate_system_tables(pool: &PgPool) -> LoomResult<()> {
     )
     .execute(pool)
     .await
-    .map_err(|e| {
-        LoomError::Internal(format!("Failed to create __user_settings table: {}", e))
-    })?;
+    .map_err(|e| LoomError::Internal(format!("Failed to create __user_settings table: {}", e)))?;
 
     // __user_permission: link-based row filtering per user
     sqlx::query(
@@ -160,9 +150,7 @@ pub async fn migrate_system_tables(pool: &PgPool) -> LoomResult<()> {
     )
     .execute(pool)
     .await
-    .map_err(|e| {
-        LoomError::Internal(format!("Failed to create __user_permission table: {}", e))
-    })?;
+    .map_err(|e| LoomError::Internal(format!("Failed to create __user_permission table: {}", e)))?;
 
     sqlx::query(
         "CREATE INDEX IF NOT EXISTS idx_user_perm_user ON \"__user_permission\" (user_email)",
@@ -203,8 +191,12 @@ pub async fn migrate_system_tables(pool: &PgPool) -> LoomResult<()> {
     // Add columns if table already existed (migration for existing installs)
     sqlx::query("ALTER TABLE \"__job_queue\" ADD COLUMN IF NOT EXISTS queue VARCHAR(60) NOT NULL DEFAULT 'default'")
         .execute(pool).await.ok();
-    sqlx::query("ALTER TABLE \"__job_queue\" ADD COLUMN IF NOT EXISTS priority INTEGER NOT NULL DEFAULT 0")
-        .execute(pool).await.ok();
+    sqlx::query(
+        "ALTER TABLE \"__job_queue\" ADD COLUMN IF NOT EXISTS priority INTEGER NOT NULL DEFAULT 0",
+    )
+    .execute(pool)
+    .await
+    .ok();
 
     // __activity: stores document activity / audit trail
     sqlx::query(
@@ -222,12 +214,10 @@ pub async fn migrate_system_tables(pool: &PgPool) -> LoomResult<()> {
     .await
     .map_err(|e| LoomError::Internal(format!("Failed to create __activity table: {}", e)))?;
 
-    sqlx::query(
-        "CREATE INDEX IF NOT EXISTS idx_activity_doc ON \"__activity\" (doctype, docname)",
-    )
-    .execute(pool)
-    .await
-    .ok();
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_activity_doc ON \"__activity\" (doctype, docname)")
+        .execute(pool)
+        .await
+        .ok();
 
     // Seed Administrator user if not exists
     let admin_exists: bool = sqlx::query_scalar(
@@ -273,41 +263,48 @@ pub async fn seed_admin_to_doctype_table(pool: &PgPool) -> LoomResult<()> {
     }
 
     // Check if Administrator already exists
-    let sql = format!("SELECT EXISTS (SELECT 1 FROM \"{}\" WHERE id = 'Administrator')", user_table);
+    let sql = format!(
+        "SELECT EXISTS (SELECT 1 FROM \"{}\" WHERE id = 'Administrator')",
+        user_table
+    );
     let admin_exists: bool = sqlx::query_scalar(&sql)
         .fetch_one(pool)
         .await
         .unwrap_or(false);
 
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S%.6f").to_string();
+    let now = chrono::Utc::now()
+        .format("%Y-%m-%d %H:%M:%S%.6f")
+        .to_string();
 
     if !admin_exists {
-    // Copy from __user if it exists there
-    let legacy_admin: Option<(String, String)> = sqlx::query_as(
-        "SELECT password_hash, full_name FROM \"__user\" WHERE email = 'Administrator'",
-    )
-    .fetch_optional(pool)
-    .await
-    .unwrap_or(None);
+        // Copy from __user if it exists there
+        let legacy_admin: Option<(String, String)> = sqlx::query_as(
+            "SELECT password_hash, full_name FROM \"__user\" WHERE email = 'Administrator'",
+        )
+        .fetch_optional(pool)
+        .await
+        .unwrap_or(None);
 
-    let (password_hash, full_name) = legacy_admin
-        .unwrap_or_else(|| (hash_password("admin"), "Administrator".to_string()));
+        let (password_hash, full_name) =
+            legacy_admin.unwrap_or_else(|| (hash_password("admin"), "Administrator".to_string()));
 
-    let sql = format!(
+        let sql = format!(
         "INSERT INTO \"{}\" (id, email, full_name, password_hash, enabled, roles_json, owner, creation, modified, modified_by, docstatus) \
          VALUES ('Administrator', 'Administrator', $1, $2, 'true', '[\"Administrator\", \"System Manager\", \"All\"]', 'Administrator', $3::TIMESTAMP, $3::TIMESTAMP, 'Administrator', 0) \
          ON CONFLICT (id) DO NOTHING",
         user_table
     );
-    sqlx::query(&sql)
-        .bind(&full_name)
-        .bind(&password_hash)
-        .bind(&now)
-        .execute(pool)
-        .await
-        .map_err(|e| LoomError::Internal(format!("Failed to seed admin to {}: {}", user_table, e)))?;
+        sqlx::query(&sql)
+            .bind(&full_name)
+            .bind(&password_hash)
+            .bind(&now)
+            .execute(pool)
+            .await
+            .map_err(|e| {
+                LoomError::Internal(format!("Failed to seed admin to {}: {}", user_table, e))
+            })?;
 
-    tracing::info!("Seeded Administrator into {}", user_table);
+        tracing::info!("Seeded Administrator into {}", user_table);
     } // end if !admin_exists
 
     // Seed default roles into Role DocType table
@@ -323,13 +320,21 @@ pub async fn seed_admin_to_doctype_table(pool: &PgPool) -> LoomResult<()> {
     if role_table_exists {
         let default_roles = [
             ("Administrator", "Full system access", "Core", false),
-            ("System Manager", "Can manage users, roles, and settings", "Core", false),
+            (
+                "System Manager",
+                "Can manage users, roles, and settings",
+                "Core",
+                false,
+            ),
             ("All", "Default role assigned to every user", "Core", false),
             ("Guest", "Unauthenticated users", "Core", false),
         ];
 
         for (role_name, description, module, is_custom) in &default_roles {
-            let check_sql = format!("SELECT EXISTS (SELECT 1 FROM \"{}\" WHERE id = $1)", role_table);
+            let check_sql = format!(
+                "SELECT EXISTS (SELECT 1 FROM \"{}\" WHERE id = $1)",
+                role_table
+            );
             let exists: bool = sqlx::query_scalar(&check_sql)
                 .bind(role_name)
                 .fetch_one(pool)
@@ -357,17 +362,18 @@ pub async fn seed_admin_to_doctype_table(pool: &PgPool) -> LoomResult<()> {
     }
 
     // Seed System app in installed_apps if not present
-    let existing_apps: serde_json::Value = sqlx::query_scalar(
-        "SELECT value FROM \"__site_config\" WHERE key = 'installed_apps'",
-    )
-    .fetch_optional(pool)
-    .await
-    .ok()
-    .flatten()
-    .unwrap_or(serde_json::json!([]));
+    let existing_apps: serde_json::Value =
+        sqlx::query_scalar("SELECT value FROM \"__site_config\" WHERE key = 'installed_apps'")
+            .fetch_optional(pool)
+            .await
+            .ok()
+            .flatten()
+            .unwrap_or(serde_json::json!([]));
 
     let mut apps = existing_apps.as_array().cloned().unwrap_or_default();
-    let has_system = apps.iter().any(|a| a.get("name").and_then(|v| v.as_str()) == Some("system"));
+    let has_system = apps
+        .iter()
+        .any(|a| a.get("name").and_then(|v| v.as_str()) == Some("system"));
 
     if !has_system {
         apps.insert(0, serde_json::json!({

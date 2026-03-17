@@ -34,34 +34,43 @@ pub async fn get_activity(
     docname: &str,
     limit: i64,
 ) -> LoomResult<Vec<Value>> {
-    let rows: Vec<(i64, String, String, String, String, Option<chrono::NaiveDateTime>, Value)> =
-        sqlx::query_as(
-            "SELECT id, doctype, docname, action, user_email, timestamp, data \
+    let rows: Vec<(
+        i64,
+        String,
+        String,
+        String,
+        String,
+        Option<chrono::NaiveDateTime>,
+        Value,
+    )> = sqlx::query_as(
+        "SELECT id, doctype, docname, action, user_email, timestamp, data \
              FROM \"__activity\" \
              WHERE doctype = $1 AND docname = $2 \
              ORDER BY timestamp DESC \
              LIMIT $3",
-        )
-        .bind(doctype)
-        .bind(docname)
-        .bind(limit)
-        .fetch_all(pool)
-        .await
-        .map_err(|e| LoomError::Internal(format!("Failed to get activity: {}", e)))?;
+    )
+    .bind(doctype)
+    .bind(docname)
+    .bind(limit)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| LoomError::Internal(format!("Failed to get activity: {}", e)))?;
 
     let result: Vec<Value> = rows
         .into_iter()
-        .map(|(id, doctype, docname, action, user_email, timestamp, data)| {
-            serde_json::json!({
-                "id": id,
-                "doctype": doctype,
-                "docname": docname,
-                "action": action,
-                "user": user_email,
-                "timestamp": timestamp.map(|t| t.format("%Y-%m-%d %H:%M:%S").to_string()),
-                "data": data,
-            })
-        })
+        .map(
+            |(id, doctype, docname, action, user_email, timestamp, data)| {
+                serde_json::json!({
+                    "id": id,
+                    "doctype": doctype,
+                    "docname": docname,
+                    "action": action,
+                    "user": user_email,
+                    "timestamp": timestamp.map(|t| t.format("%Y-%m-%d %H:%M:%S").to_string()),
+                    "data": data,
+                })
+            },
+        )
         .collect();
 
     Ok(result)

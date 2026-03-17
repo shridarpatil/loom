@@ -3,12 +3,12 @@ use std::sync::Arc;
 use clap::Args;
 use sqlx::postgres::PgPoolOptions;
 
-use loom_api::{build_router, AppCache, AppState};
 use loom_api::realtime::RealtimeHub;
+use loom_api::{build_router, AppCache, AppState};
+use loom_core::db::migrate::{self, migrate_doctype, migrate_system_tables};
 use loom_core::doctype::{DocTypeRegistry, Meta, RhaiHookRunner};
-use loom_core::script::{ScriptCache, create_engine};
-use loom_core::db::migrate::{self, migrate_system_tables, migrate_doctype};
-use loom_queue::{Worker, Scheduler};
+use loom_core::script::{create_engine, ScriptCache};
+use loom_queue::{Scheduler, Worker};
 
 #[derive(Debug, Args)]
 pub struct ServeArgs {
@@ -94,7 +94,9 @@ pub async fn run(args: ServeArgs) -> anyhow::Result<()> {
 
     // Auto-migrate all loaded DocTypes
     for dt_name in registry.all_doctypes().await {
-        if dt_name == "DocType" { continue; }
+        if dt_name == "DocType" {
+            continue;
+        }
         if let Ok(meta) = registry.get_meta(&dt_name).await {
             migrate_doctype(&pool, &meta).await?;
         }
@@ -125,7 +127,9 @@ pub async fn run(args: ServeArgs) -> anyhow::Result<()> {
                 if path.is_dir() {
                     let doctypes_dir = path.join("doctypes");
                     if doctypes_dir.exists() {
-                        let count = hook_runner.load_scripts_from_directory(&doctypes_dir).await?;
+                        let count = hook_runner
+                            .load_scripts_from_directory(&doctypes_dir)
+                            .await?;
                         if count > 0 {
                             tracing::info!(
                                 "Loaded {} scripts from app '{}'",

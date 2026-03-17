@@ -63,8 +63,7 @@ impl RequestContext {
 
     /// Check if the current user is the Administrator.
     pub fn is_administrator(&self) -> bool {
-        self.user == "Administrator"
-            || self.roles.iter().any(|r| r == "Administrator")
+        self.user == "Administrator" || self.roles.iter().any(|r| r == "Administrator")
     }
 
     /// Check if the current user has a specific role.
@@ -80,6 +79,10 @@ impl RequestContext {
     /// Check if permissions should be ignored (e.g., system operations).
     pub fn ignore_permissions(&self) -> bool {
         self.is_administrator()
-            || self.flags.get("ignore_permissions").copied().unwrap_or(false)
+            || self
+                .flags
+                .get("ignore_permissions")
+                .copied()
+                .unwrap_or(false)
     }
 }

@@ -158,7 +158,10 @@ loom export-fixtures
     println!("  Structure:");
     println!("    {}/loom_app.toml    — App metadata", app_dir);
     println!("    {}/hooks.toml      — Hooks, fixtures, queues", app_dir);
-    println!("    {}/doctypes/       — DocType definitions (JSON + Rhai)", app_dir);
+    println!(
+        "    {}/doctypes/       — DocType definitions (JSON + Rhai)",
+        app_dir
+    );
     println!("    {}/api/            — Whitelisted API methods", app_dir);
     println!("    {}/fixtures/       — Seed data", app_dir);
     println!("    {}/scripts/        — Shared Rhai scripts", app_dir);
@@ -166,8 +169,14 @@ loom export-fixtures
     println!("  Next steps:");
     println!("    1. Create DocTypes in the Desk UI at /app/DocType/new");
     println!("    2. Enable developer mode in site_config.json");
-    println!("    3. DocType JSON files auto-export to {}/doctypes/", app_dir);
-    println!("    4. loom --site mysite.localhost install-app {}", args.app_name);
+    println!(
+        "    3. DocType JSON files auto-export to {}/doctypes/",
+        app_dir
+    );
+    println!(
+        "    4. loom --site mysite.localhost install-app {}",
+        args.app_name
+    );
 
     Ok(())
 }

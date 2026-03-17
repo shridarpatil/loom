@@ -1,17 +1,15 @@
+use crate::server::AppState;
 use axum::{
     extract::{Extension, State},
     http::StatusCode,
     response::IntoResponse,
     Json,
 };
-use crate::server::AppState;
 
 /// GET /api/config/theme — public, returns theme JSON or defaults
-pub async fn get_theme(
-    State(state): State<AppState>,
-) -> impl IntoResponse {
+pub async fn get_theme(State(state): State<AppState>) -> impl IntoResponse {
     let result = sqlx::query_scalar::<_, serde_json::Value>(
-        "SELECT value FROM \"__site_config\" WHERE key = 'theme'"
+        "SELECT value FROM \"__site_config\" WHERE key = 'theme'",
     )
     .fetch_optional(&state.pool)
     .await;
@@ -26,12 +24,17 @@ pub async fn get_theme(
                 "font_family": "Inter",
                 "radius": "0.375rem"
             }
-        })).into_response(),
+        }))
+        .into_response(),
         Err(e) => {
             tracing::error!("Failed to read theme: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({
-                "error": "Failed to read theme"
-            }))).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({
+                    "error": "Failed to read theme"
+                })),
+            )
+                .into_response()
         }
     }
 }
@@ -44,15 +47,19 @@ pub async fn save_theme(
 ) -> impl IntoResponse {
     // Admin only
     if !ctx.is_administrator() && !ctx.has_role("System Manager") {
-        return (StatusCode::FORBIDDEN, Json(serde_json::json!({
-            "error": "Only administrators can update theme"
-        }))).into_response();
+        return (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({
+                "error": "Only administrators can update theme"
+            })),
+        )
+            .into_response();
     }
 
     let result = sqlx::query(
         "INSERT INTO \"__site_config\" (key, value, modified)
          VALUES ('theme', $1, NOW())
-         ON CONFLICT (key) DO UPDATE SET value = $1, modified = NOW()"
+         ON CONFLICT (key) DO UPDATE SET value = $1, modified = NOW()",
     )
     .bind(&body)
     .execute(&state.pool)
@@ -62,9 +69,13 @@ pub async fn save_theme(
         Ok(_) => Json(serde_json::json!({ "message": "Theme saved" })).into_response(),
         Err(e) => {
             tracing::error!("Failed to save theme: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({
-                "error": "Failed to save theme"
-            }))).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({
+                    "error": "Failed to save theme"
+                })),
+            )
+                .into_response()
         }
     }
 }

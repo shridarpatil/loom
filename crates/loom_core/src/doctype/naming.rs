@@ -1,24 +1,19 @@
 use sqlx::PgPool;
 
-use crate::error::{LoomError, LoomResult};
 use super::meta::{Meta, NamingRule};
+use crate::error::{LoomError, LoomResult};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 /// Generate an `id` (primary key) for a new document based on the DocType's naming rule.
-pub fn generate_name(
-    meta: &Meta,
-    doc: &serde_json::Value,
-) -> LoomResult<String> {
+pub fn generate_name(meta: &Meta, doc: &serde_json::Value) -> LoomResult<String> {
     match &meta.naming_rule {
         NamingRule::Autoincrement => {
             // Autoincrement is handled at the DB level; return a placeholder.
             // The actual insert will use a DB sequence.
             Ok(String::new())
         }
-        NamingRule::Hash => {
-            Ok(Uuid::new_v4().to_string().replace('-', "")[..10].to_string())
-        }
+        NamingRule::Hash => Ok(Uuid::new_v4().to_string().replace('-', "")[..10].to_string()),
         NamingRule::ByFieldname => {
             let field = meta.autoname.as_deref().unwrap_or("name");
             // Strip "by_fieldname(" prefix and ")" suffix if present
@@ -41,15 +36,12 @@ pub fn generate_name(
             // Series naming (e.g., "HR-LEAVE-.YYYY.-.#####") is handled
             // by the naming series counter in the database.
             // Return the pattern; actual resolution happens at insert time.
-            let pattern = meta
-                .autoname
-                .as_deref()
-                .ok_or_else(|| {
-                    LoomError::Validation(format!(
-                        "DocType '{}' uses series naming but has no autoname pattern",
-                        meta.name
-                    ))
-                })?;
+            let pattern = meta.autoname.as_deref().ok_or_else(|| {
+                LoomError::Validation(format!(
+                    "DocType '{}' uses series naming but has no autoname pattern",
+                    meta.name
+                ))
+            })?;
             Ok(pattern.to_string())
         }
         NamingRule::Prompt => {
@@ -66,15 +58,12 @@ pub fn generate_name(
                 })
         }
         NamingRule::Expression => {
-            let expr = meta
-                .autoname
-                .as_deref()
-                .ok_or_else(|| {
-                    LoomError::Validation(format!(
-                        "DocType '{}' uses expression naming but has no autoname expression",
-                        meta.name
-                    ))
-                })?;
+            let expr = meta.autoname.as_deref().ok_or_else(|| {
+                LoomError::Validation(format!(
+                    "DocType '{}' uses expression naming but has no autoname expression",
+                    meta.name
+                ))
+            })?;
             resolve_expression(expr, doc)
         }
     }

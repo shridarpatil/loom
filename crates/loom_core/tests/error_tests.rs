@@ -6,7 +6,10 @@ fn test_error_types() {
     assert_eq!(err.error_type(), "ValidationError");
     assert!(err.to_string().contains("Field required"));
 
-    let err = LoomError::NotFound { doctype: "Todo".into(), name: "1".into() };
+    let err = LoomError::NotFound {
+        doctype: "Todo".into(),
+        name: "1".into(),
+    };
     assert_eq!(err.error_type(), "NotFoundError");
     assert!(err.to_string().contains("Todo"));
     assert!(err.to_string().contains("1"));

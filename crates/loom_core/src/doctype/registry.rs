@@ -45,23 +45,20 @@ impl DocTypeRegistry {
     pub async fn get_effective_meta(&self, doctype: &str, pool: &PgPool) -> LoomResult<Meta> {
         let mut meta = self.get_meta(doctype).await?;
 
-        let row: Option<(serde_json::Value,)> = sqlx::query_as(
-            "SELECT overrides FROM \"__customization\" WHERE doctype = $1",
-        )
-        .bind(doctype)
-        .fetch_optional(pool)
-        .await
-        .unwrap_or(None);
+        let row: Option<(serde_json::Value,)> =
+            sqlx::query_as("SELECT overrides FROM \"__customization\" WHERE doctype = $1")
+                .bind(doctype)
+                .fetch_optional(pool)
+                .await
+                .unwrap_or(None);
 
         if let Some((overrides,)) = row {
             if let Some(perm_overrides) = overrides.get("__permissions") {
                 if let Ok(override_perms) =
                     serde_json::from_value::<Vec<super::meta::DocPermMeta>>(perm_overrides.clone())
                 {
-                    meta.permissions = super::meta::merge_permission_overrides(
-                        &meta.permissions,
-                        &override_perms,
-                    );
+                    meta.permissions =
+                        super::meta::merge_permission_overrides(&meta.permissions, &override_perms);
                 }
             }
         }
@@ -86,10 +83,7 @@ impl DocTypeRegistry {
 
     /// Load all DocType definitions from JSON files in a directory (recursive).
     /// **Bug fix:** Now actually registers the loaded Meta objects into the registry.
-    pub async fn load_from_directory(
-        &self,
-        dir: &std::path::Path,
-    ) -> LoomResult<usize> {
+    pub async fn load_from_directory(&self, dir: &std::path::Path) -> LoomResult<usize> {
         if !dir.exists() {
             return Ok(0);
         }
@@ -117,11 +111,10 @@ impl DocTypeRegistry {
             return Ok(0);
         }
 
-        let rows: Vec<(String, serde_json::Value)> = sqlx::query_as(
-            "SELECT name, meta FROM \"__doctype\"",
-        )
-        .fetch_all(pool)
-        .await?;
+        let rows: Vec<(String, serde_json::Value)> =
+            sqlx::query_as("SELECT name, meta FROM \"__doctype\"")
+                .fetch_all(pool)
+                .await?;
 
         let mut count = 0;
         for (name, meta_json) in rows {
@@ -146,8 +139,9 @@ impl DocTypeRegistry {
         let mut count = 0;
 
         for (name, meta) in &doctypes {
-            let meta_json = serde_json::to_value(meta)
-                .map_err(|e| LoomError::Internal(format!("Failed to serialize DocType '{}': {}", name, e)))?;
+            let meta_json = serde_json::to_value(meta).map_err(|e| {
+                LoomError::Internal(format!("Failed to serialize DocType '{}': {}", name, e))
+            })?;
 
             sqlx::query(
                 "INSERT INTO \"__doctype\" (name, module, meta, modified) \

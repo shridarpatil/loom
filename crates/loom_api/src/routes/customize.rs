@@ -5,8 +5,8 @@ use axum::{
 };
 use serde_json::{json, Value};
 
-use loom_core::context::RequestContext;
 use crate::server::AppState;
+use loom_core::context::RequestContext;
 
 /// GET /api/customize/:doctype — get customization for a DocType
 pub async fn get_customization(
@@ -19,20 +19,24 @@ pub async fn get_customization(
     .bind(&doctype)
     .fetch_optional(ctx.pool())
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": e.to_string()})),
+        )
+    })?;
 
     // Load server script from __script table
     let slug = doctype.to_lowercase().replace(' ', "_");
-    let server_script: String = sqlx::query_scalar(
-        "SELECT script FROM \"__script\" WHERE name = $1 OR doctype = $2",
-    )
-    .bind(&slug)
-    .bind(&doctype)
-    .fetch_optional(ctx.pool())
-    .await
-    .ok()
-    .flatten()
-    .unwrap_or_default();
+    let server_script: String =
+        sqlx::query_scalar("SELECT script FROM \"__script\" WHERE name = $1 OR doctype = $2")
+            .bind(&slug)
+            .bind(&doctype)
+            .fetch_optional(ctx.pool())
+            .await
+            .ok()
+            .flatten()
+            .unwrap_or_default();
 
     match row {
         Some((overrides, client_script)) => Ok(Json(json!({
@@ -84,7 +88,12 @@ pub async fn save_customization(
     .bind(&client_script)
     .execute(ctx.pool())
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": e.to_string()})),
+        )
+    })?;
 
     // Save server script to __script table and hot-reload hook runner
     let slug = doctype.to_lowercase().replace(' ', "_");
@@ -99,10 +108,18 @@ pub async fn save_customization(
         .bind(&server_script)
         .execute(ctx.pool())
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
+            )
+        })?;
 
         // Hot-reload: update the hook runner with the new script
-        state.hook_runner.load_script(&slug, server_script.clone()).await;
+        state
+            .hook_runner
+            .load_script(&slug, server_script.clone())
+            .await;
         tracing::info!("Hot-reloaded server script for '{}'", doctype);
     } else {
         // Clear script if empty
@@ -138,21 +155,25 @@ pub async fn export_customization(
     .bind(&doctype)
     .fetch_optional(ctx.pool())
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": e.to_string()})),
+        )
+    })?;
 
     let slug = doctype.to_lowercase().replace(' ', "_");
 
     // Load server script
-    let server_script: String = sqlx::query_scalar(
-        "SELECT script FROM \"__script\" WHERE name = $1 OR doctype = $2",
-    )
-    .bind(&slug)
-    .bind(&doctype)
-    .fetch_optional(ctx.pool())
-    .await
-    .ok()
-    .flatten()
-    .unwrap_or_default();
+    let server_script: String =
+        sqlx::query_scalar("SELECT script FROM \"__script\" WHERE name = $1 OR doctype = $2")
+            .bind(&slug)
+            .bind(&doctype)
+            .fetch_optional(ctx.pool())
+            .await
+            .ok()
+            .flatten()
+            .unwrap_or_default();
 
     let (overrides, client_script) = row.unwrap_or((json!({}), String::new()));
 
@@ -179,7 +200,10 @@ pub async fn export_customization(
 
     let dt_dir = apps_dir.join(&app_name).join("doctypes").join(&slug);
     std::fs::create_dir_all(&dt_dir).map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Failed to create directory: {}", e)})))
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": format!("Failed to create directory: {}", e)})),
+        )
     })?;
 
     let mut exported = Vec::new();
@@ -189,7 +213,10 @@ pub async fn export_customization(
         let path = dt_dir.join(format!("{}.customize.json", slug));
         let pretty = serde_json::to_string_pretty(&overrides).unwrap();
         std::fs::write(&path, &pretty).map_err(|e| {
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Failed to write: {}", e)})))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": format!("Failed to write: {}", e)})),
+            )
         })?;
         exported.push(format!("{}.customize.json", slug));
     }
@@ -198,7 +225,10 @@ pub async fn export_customization(
     if !client_script.is_empty() {
         let path = dt_dir.join(format!("{}.client.js", slug));
         std::fs::write(&path, &client_script).map_err(|e| {
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Failed to write: {}", e)})))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": format!("Failed to write: {}", e)})),
+            )
         })?;
         exported.push(format!("{}.client.js", slug));
     }
@@ -207,12 +237,19 @@ pub async fn export_customization(
     if !server_script.is_empty() {
         let path = dt_dir.join(format!("{}.rhai", slug));
         std::fs::write(&path, &server_script).map_err(|e| {
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Failed to write: {}", e)})))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": format!("Failed to write: {}", e)})),
+            )
         })?;
         exported.push(format!("{}.rhai", slug));
     }
 
-    tracing::info!("Exported customization for '{}' to app '{}'", doctype, app_name);
+    tracing::info!(
+        "Exported customization for '{}' to app '{}'",
+        doctype,
+        app_name
+    );
 
     Ok(Json(json!({
         "message": format!("Exported to apps/{}/doctypes/{}: {}", app_name, slug, exported.join(", ")),
@@ -223,7 +260,12 @@ pub async fn export_customization(
 
 /// Apply customization overrides to a Meta JSON value.
 /// Uses cache if provided to avoid DB hit on every request.
-pub async fn apply_customization(pool: &sqlx::PgPool, doctype: &str, meta: &mut Value, cache: Option<&crate::cache::AppCache>) {
+pub async fn apply_customization(
+    pool: &sqlx::PgPool,
+    doctype: &str,
+    meta: &mut Value,
+    cache: Option<&crate::cache::AppCache>,
+) {
     // Try cache first
     let cached = if let Some(c) = cache {
         c.customizations.get(doctype).await
@@ -233,7 +275,11 @@ pub async fn apply_customization(pool: &sqlx::PgPool, doctype: &str, meta: &mut 
 
     let (overrides, client_script) = if let Some(Some(cached_val)) = cached {
         // Cache hit — extract overrides and client_script
-        let cs = cached_val.get("__client_script").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let cs = cached_val
+            .get("__client_script")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
         (cached_val, cs)
     } else {
         // Cache miss or no cache — query DB
@@ -259,7 +305,9 @@ pub async fn apply_customization(pool: &sqlx::PgPool, doctype: &str, meta: &mut 
             if let Some(obj) = cache_val.as_object_mut() {
                 obj.insert("__client_script".to_string(), json!(client_script));
             }
-            c.customizations.set(doctype.to_string(), Some(cache_val)).await;
+            c.customizations
+                .set(doctype.to_string(), Some(cache_val))
+                .await;
         }
 
         (overrides, client_script)
@@ -268,7 +316,10 @@ pub async fn apply_customization(pool: &sqlx::PgPool, doctype: &str, meta: &mut 
     if let Some(field_overrides) = overrides.as_object() {
         if let Some(fields) = meta.get_mut("fields").and_then(|f| f.as_array_mut()) {
             for field in fields.iter_mut() {
-                let fieldname = field.get("fieldname").and_then(|v| v.as_str()).unwrap_or("");
+                let fieldname = field
+                    .get("fieldname")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
                 if let Some(patches) = field_overrides.get(fieldname).and_then(|v| v.as_object()) {
                     if let Some(obj) = field.as_object_mut() {
                         for (key, val) in patches {
@@ -283,12 +334,23 @@ pub async fn apply_customization(pool: &sqlx::PgPool, doctype: &str, meta: &mut 
     // Apply permission overrides: merge with defaults using shared function
     if let Some(field_overrides) = overrides.as_object() {
         if let Some(perm_overrides) = field_overrides.get("__permissions") {
-            if let Ok(override_perms) = serde_json::from_value::<Vec<loom_core::doctype::DocPermMeta>>(perm_overrides.clone()) {
+            if let Ok(override_perms) = serde_json::from_value::<Vec<loom_core::doctype::DocPermMeta>>(
+                perm_overrides.clone(),
+            ) {
                 if let Some(default_perms_json) = meta.get("permissions") {
-                    if let Ok(default_perms) = serde_json::from_value::<Vec<loom_core::doctype::DocPermMeta>>(default_perms_json.clone()) {
-                        let merged = loom_core::doctype::merge_permission_overrides(&default_perms, &override_perms);
+                    if let Ok(default_perms) = serde_json::from_value::<
+                        Vec<loom_core::doctype::DocPermMeta>,
+                    >(default_perms_json.clone())
+                    {
+                        let merged = loom_core::doctype::merge_permission_overrides(
+                            &default_perms,
+                            &override_perms,
+                        );
                         if let Some(obj) = meta.as_object_mut() {
-                            obj.insert("permissions".to_string(), serde_json::to_value(&merged).unwrap_or_default());
+                            obj.insert(
+                                "permissions".to_string(),
+                                serde_json::to_value(&merged).unwrap_or_default(),
+                            );
                         }
                     }
                 }
@@ -303,7 +365,6 @@ pub async fn apply_customization(pool: &sqlx::PgPool, doctype: &str, meta: &mut 
         }
     }
 }
-
 
 // =========================================================================
 // Role Permission Manager API
@@ -323,16 +384,20 @@ pub async fn get_role_permissions(
         .map_err(|e| (StatusCode::NOT_FOUND, Json(json!({"error": e.to_string()}))))?;
 
     // Get overrides
-    let row: Option<(Value,)> = sqlx::query_as(
-        "SELECT overrides FROM \"__customization\" WHERE doctype = $1",
-    )
-    .bind(&doctype)
-    .fetch_optional(ctx.pool())
-    .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+    let row: Option<(Value,)> =
+        sqlx::query_as("SELECT overrides FROM \"__customization\" WHERE doctype = $1")
+            .bind(&doctype)
+            .fetch_optional(ctx.pool())
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"error": e.to_string()})),
+                )
+            })?;
 
-    let override_permissions: Option<Value> = row
-        .and_then(|(overrides,)| overrides.get("__permissions").cloned());
+    let override_permissions: Option<Value> =
+        row.and_then(|(overrides,)| overrides.get("__permissions").cloned());
 
     // Get all distinct roles
     let roles: Vec<String> = sqlx::query_scalar(
@@ -368,15 +433,14 @@ pub async fn save_role_permissions(
     })?;
 
     // Load existing overrides to preserve field overrides
-    let existing: Value = sqlx::query_scalar(
-        "SELECT overrides FROM \"__customization\" WHERE doctype = $1",
-    )
-    .bind(&doctype)
-    .fetch_optional(ctx.pool())
-    .await
-    .ok()
-    .flatten()
-    .unwrap_or(json!({}));
+    let existing: Value =
+        sqlx::query_scalar("SELECT overrides FROM \"__customization\" WHERE doctype = $1")
+            .bind(&doctype)
+            .fetch_optional(ctx.pool())
+            .await
+            .ok()
+            .flatten()
+            .unwrap_or(json!({}));
 
     let mut overrides = existing.as_object().cloned().unwrap_or_default();
     overrides.insert("__permissions".to_string(), permissions.clone());
@@ -390,7 +454,12 @@ pub async fn save_role_permissions(
     .bind(&json!(overrides))
     .execute(ctx.pool())
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": e.to_string()})),
+        )
+    })?;
 
     state.cache.invalidate_customization(&doctype).await;
     tracing::info!("Saved permission overrides for '{}'", doctype);
@@ -405,15 +474,14 @@ pub async fn reset_role_permissions(
     Path(doctype): Path<String>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
     // Load existing overrides, remove __permissions, save back
-    let existing: Value = sqlx::query_scalar(
-        "SELECT overrides FROM \"__customization\" WHERE doctype = $1",
-    )
-    .bind(&doctype)
-    .fetch_optional(ctx.pool())
-    .await
-    .ok()
-    .flatten()
-    .unwrap_or(json!({}));
+    let existing: Value =
+        sqlx::query_scalar("SELECT overrides FROM \"__customization\" WHERE doctype = $1")
+            .bind(&doctype)
+            .fetch_optional(ctx.pool())
+            .await
+            .ok()
+            .flatten()
+            .unwrap_or(json!({}));
 
     let mut overrides = existing.as_object().cloned().unwrap_or_default();
     overrides.remove("__permissions");
@@ -463,11 +531,8 @@ pub async fn get_permissions_by_role(
         }
 
         // Find permission rules for this role
-        let role_perms: Vec<&loom_core::doctype::DocPermMeta> = meta
-            .permissions
-            .iter()
-            .filter(|p| p.role == role)
-            .collect();
+        let role_perms: Vec<&loom_core::doctype::DocPermMeta> =
+            meta.permissions.iter().filter(|p| p.role == role).collect();
 
         if role_perms.is_empty() {
             continue;

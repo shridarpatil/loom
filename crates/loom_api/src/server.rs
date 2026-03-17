@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
 use axum::{
-    Router, Json,
     extract::{Extension, Request},
     http::StatusCode,
     middleware::{self, Next},
     response::{Html, IntoResponse},
     routing::{delete, get, post, put},
+    Json, Router,
 };
 use sqlx::PgPool;
 use tower_http::cors::CorsLayer;
@@ -18,7 +18,9 @@ use loom_core::doctype::{DocTypeRegistry, RhaiHookRunner};
 use crate::cache::AppCache;
 use crate::middleware::auth;
 use crate::realtime::{self, RealtimeHub};
-use crate::routes::{self, activity, config, customize, doctype, method, resource, settings, upload};
+use crate::routes::{
+    self, activity, config, customize, doctype, method, resource, settings, upload,
+};
 
 /// Shared application state accessible by all handlers.
 #[derive(Debug, Clone)]
@@ -60,15 +62,27 @@ pub fn build_router(state: AppState, frontend_dir: Option<String>) -> Router {
         .route("/api/resource/:doctype/:name", put(resource::update_doc))
         .route("/api/resource/:doctype/:name", delete(resource::delete_doc))
         // Submit / Cancel
-        .route("/api/resource/:doctype/:name/submit", post(resource::submit_doc))
-        .route("/api/resource/:doctype/:name/cancel", post(resource::cancel_doc))
+        .route(
+            "/api/resource/:doctype/:name/submit",
+            post(resource::submit_doc),
+        )
+        .route(
+            "/api/resource/:doctype/:name/cancel",
+            post(resource::cancel_doc),
+        )
         // DocType meta
         .route("/api/doctype/:name", get(doctype::get_meta))
         .route("/api/doctype/:name/export", post(doctype::export_meta))
         // Customization
         .route("/api/customize/:doctype", get(customize::get_customization))
-        .route("/api/customize/:doctype", put(customize::save_customization))
-        .route("/api/customize/:doctype/export", post(customize::export_customization))
+        .route(
+            "/api/customize/:doctype",
+            put(customize::save_customization),
+        )
+        .route(
+            "/api/customize/:doctype/export",
+            post(customize::export_customization),
+        )
         // Apps
         .route("/api/apps", get(doctype::list_apps_handler))
         // Session
@@ -85,13 +99,28 @@ pub fn build_router(state: AppState, frontend_dir: Option<String>) -> Router {
         // Plugin pages
         .route("/api/plugins/pages", get(settings::get_plugin_pages))
         // Role Permission Manager
-        .route("/api/role-permission/:doctype", get(customize::get_role_permissions))
-        .route("/api/role-permission/:doctype", put(customize::save_role_permissions))
-        .route("/api/role-permission/:doctype", delete(customize::reset_role_permissions))
-        .route("/api/role-permission-by-role/:role", get(customize::get_permissions_by_role))
+        .route(
+            "/api/role-permission/:doctype",
+            get(customize::get_role_permissions),
+        )
+        .route(
+            "/api/role-permission/:doctype",
+            put(customize::save_role_permissions),
+        )
+        .route(
+            "/api/role-permission/:doctype",
+            delete(customize::reset_role_permissions),
+        )
+        .route(
+            "/api/role-permission-by-role/:role",
+            get(customize::get_permissions_by_role),
+        )
         // Activity / audit trail
         .route("/api/activity/:doctype/:name", get(activity::get_activity))
-        .route("/api/activity/:doctype/:name/comment", post(activity::add_comment))
+        .route(
+            "/api/activity/:doctype/:name/comment",
+            post(activity::add_comment),
+        )
         // File uploads
         .route("/api/upload", post(upload::upload_file))
         .layer(auth_layer)
@@ -106,22 +135,21 @@ pub fn build_router(state: AppState, frontend_dir: Option<String>) -> Router {
 
     // Serve uploaded files
     let uploads_dir = std::path::Path::new("sites/uploads");
-    let upload_service = Router::new()
-        .nest_service("/uploads", ServeDir::new(uploads_dir));
+    let upload_service = Router::new().nest_service("/uploads", ServeDir::new(uploads_dir));
 
-    let api = public.merge(protected).merge(ws_routes).merge(upload_service);
+    let api = public
+        .merge(protected)
+        .merge(ws_routes)
+        .merge(upload_service);
 
     // If a frontend directory is provided, serve static assets from it
     // and fall back to index.html for SPA routes
     if let Some(ref dir) = frontend_dir {
         let spa_dir = dir.clone();
-        api.fallback_service(
-            ServeDir::new(dir)
-                .fallback(get(move || {
-                    let d = spa_dir.clone();
-                    async move { serve_index(&d).await }
-                })),
-        )
+        api.fallback_service(ServeDir::new(dir).fallback(get(move || {
+            let d = spa_dir.clone();
+            async move { serve_index(&d).await }
+        })))
     } else {
         api
     }

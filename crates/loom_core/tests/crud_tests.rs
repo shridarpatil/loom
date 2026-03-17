@@ -1,14 +1,17 @@
-use loom_core::doctype::meta::*;
 use loom_core::doctype::crud::*;
+use loom_core::doctype::meta::*;
 use serde_json::json;
 
 #[test]
 fn test_validate_required_fields_passes() {
     let meta = Meta {
         name: "Test".into(),
-        fields: vec![
-            DocFieldMeta { fieldname: "title".into(), fieldtype: FieldType::Data, reqd: true, ..DocFieldMeta::default() },
-        ],
+        fields: vec![DocFieldMeta {
+            fieldname: "title".into(),
+            fieldtype: FieldType::Data,
+            reqd: true,
+            ..DocFieldMeta::default()
+        }],
         ..Meta::default()
     };
     let doc = json!({ "title": "Hello" });
@@ -82,8 +85,14 @@ fn test_sanitize_order_by() {
     assert_eq!(sanitize_order_by_for_test("modified"), "\"modified\"");
 
     // Field with direction
-    assert_eq!(sanitize_order_by_for_test("modified desc"), "\"modified\" DESC");
-    assert_eq!(sanitize_order_by_for_test("creation ASC"), "\"creation\" ASC");
+    assert_eq!(
+        sanitize_order_by_for_test("modified desc"),
+        "\"modified\" DESC"
+    );
+    assert_eq!(
+        sanitize_order_by_for_test("creation ASC"),
+        "\"creation\" ASC"
+    );
 
     // Multiple fields
     assert_eq!(
@@ -107,12 +116,22 @@ fn sanitize_order_by_for_test(input: &str) -> String {
             let tokens: Vec<&str> = part.split_whitespace().collect();
             match tokens.as_slice() {
                 [field] => {
-                    let f: String = field.chars().filter(|c| c.is_alphanumeric() || *c == '_').collect();
+                    let f: String = field
+                        .chars()
+                        .filter(|c| c.is_alphanumeric() || *c == '_')
+                        .collect();
                     format!("\"{}\"", f)
                 }
                 [field, dir] => {
-                    let f: String = field.chars().filter(|c| c.is_alphanumeric() || *c == '_').collect();
-                    let d = if dir.eq_ignore_ascii_case("asc") { "ASC" } else { "DESC" };
+                    let f: String = field
+                        .chars()
+                        .filter(|c| c.is_alphanumeric() || *c == '_')
+                        .collect();
+                    let d = if dir.eq_ignore_ascii_case("asc") {
+                        "ASC"
+                    } else {
+                        "DESC"
+                    };
                     format!("\"{}\" {}", f, d)
                 }
                 _ => "\"modified\" DESC".to_string(),

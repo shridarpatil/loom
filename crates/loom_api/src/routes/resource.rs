@@ -7,15 +7,15 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 
 use loom_core::context::RequestContext;
-use loom_core::doctype::{controller, Meta};
 use loom_core::db::migrate::migrate_doctype;
+use loom_core::doctype::{controller, Meta};
 
 use crate::server::AppState;
 
 #[derive(Debug, Deserialize)]
 pub struct ListParams {
-    pub filters: Option<String>,   // JSON-encoded filters
-    pub fields: Option<String>,    // JSON-encoded or comma-separated field names
+    pub filters: Option<String>, // JSON-encoded filters
+    pub fields: Option<String>,  // JSON-encoded or comma-separated field names
     pub order_by: Option<String>,
     pub limit_page_length: Option<u32>,
     pub limit_start: Option<u32>,
@@ -136,7 +136,9 @@ pub async fn insert_doc(
         .map_err(|e| error_response(&e))?;
 
     let doc_name = doc.get("id").and_then(|v| v.as_str()).unwrap_or("");
-    state.realtime.publish_doc_update(&doctype, doc_name, "created");
+    state
+        .realtime
+        .publish_doc_update(&doctype, doc_name, "created");
 
     Ok((StatusCode::CREATED, Json(json!({ "data": doc }))))
 }
@@ -171,14 +173,12 @@ async fn create_doctype(
     }
 
     // Auto-migrate: create the database table
-    migrate_doctype(ctx.pool(), &new_meta)
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": format!("Migration failed: {}", e)})),
-            )
-        })?;
+    migrate_doctype(ctx.pool(), &new_meta).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": format!("Migration failed: {}", e)})),
+        )
+    })?;
 
     // Save meta to __doctype table
     let meta_json = serde_json::to_value(&new_meta).unwrap();
@@ -216,13 +216,9 @@ async fn create_doctype(
         "permissions_json": serde_json::to_value(&new_meta.permissions).unwrap(),
     });
     // Use CRUD to insert the row into tabDocType
-    let _ = loom_core::doctype::crud::insert_doc(
-        ctx.pool(),
-        &doctype_meta,
-        &mut tab_doc,
-        &ctx.user,
-    )
-    .await;
+    let _ =
+        loom_core::doctype::crud::insert_doc(ctx.pool(), &doctype_meta, &mut tab_doc, &ctx.user)
+            .await;
 
     // Auto-export JSON to app directory (developer mode only)
     if super::doctype::is_developer_mode() {
@@ -263,7 +259,9 @@ pub async fn update_doc(
         .await
         .map_err(|e| error_response(&e))?;
 
-    state.realtime.publish_doc_update(&doctype, &name, "updated");
+    state
+        .realtime
+        .publish_doc_update(&doctype, &name, "updated");
 
     Ok(Json(json!({ "data": doc })))
 }
@@ -290,14 +288,12 @@ async fn update_doctype(
     }
 
     // Re-migrate table (adds new columns)
-    migrate_doctype(ctx.pool(), &new_meta)
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": format!("Migration failed: {}", e)})),
-            )
-        })?;
+    migrate_doctype(ctx.pool(), &new_meta).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": format!("Migration failed: {}", e)})),
+        )
+    })?;
 
     // Update __doctype table
     let meta_json = serde_json::to_value(&new_meta).unwrap();
@@ -327,7 +323,9 @@ async fn update_doctype(
 
     tracing::info!("Updated DocType '{}'", updated_name);
 
-    Ok(Json(json!({ "data": { "name": updated_name, "doctype": "DocType" } })))
+    Ok(Json(
+        json!({ "data": { "name": updated_name, "doctype": "DocType" } }),
+    ))
 }
 
 /// DELETE /api/resource/:doctype/:name — delete a document
@@ -346,7 +344,9 @@ pub async fn delete_doc(
         .await
         .map_err(|e| error_response(&e))?;
 
-    state.realtime.publish_doc_update(&doctype, &name, "deleted");
+    state
+        .realtime
+        .publish_doc_update(&doctype, &name, "deleted");
 
     Ok(Json(json!({ "message": "ok" })))
 }
@@ -367,7 +367,9 @@ pub async fn submit_doc(
         .await
         .map_err(|e| error_response(&e))?;
 
-    state.realtime.publish_doc_update(&doctype, &name, "submitted");
+    state
+        .realtime
+        .publish_doc_update(&doctype, &name, "submitted");
 
     Ok(Json(json!({ "data": doc })))
 }
@@ -388,7 +390,9 @@ pub async fn cancel_doc(
         .await
         .map_err(|e| error_response(&e))?;
 
-    state.realtime.publish_doc_update(&doctype, &name, "cancelled");
+    state
+        .realtime
+        .publish_doc_update(&doctype, &name, "cancelled");
 
     Ok(Json(json!({ "data": doc })))
 }
@@ -427,9 +431,14 @@ pub async fn export_fixtures(
 
     // Fetch records
     let docs = controller::get_list(
-        &ctx, &meta,
+        &ctx,
+        &meta,
         filters.as_ref(),
-        None, None, Some(10000), None, None,
+        None,
+        None,
+        Some(10000),
+        None,
+        None,
     )
     .await
     .map_err(|e| error_response(&e))?;
@@ -451,29 +460,44 @@ pub async fn export_fixtures(
         super::doctype::find_app_for_doctype(&apps_dir, &slug)
             .or_else(|| {
                 let module_slug = meta.module.to_lowercase().replace(' ', "_");
-                if apps_dir.join(&module_slug).is_dir() { Some(module_slug) } else { None }
+                if apps_dir.join(&module_slug).is_dir() {
+                    Some(module_slug)
+                } else {
+                    None
+                }
             })
             .or_else(|| super::doctype::find_single_app(&apps_dir))
-            .ok_or_else(|| (
-                StatusCode::BAD_REQUEST,
-                Json(json!({"error": "Could not determine target app. Specify ?app=my_app"})),
-            ))?
+            .ok_or_else(|| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({"error": "Could not determine target app. Specify ?app=my_app"})),
+                )
+            })?
     };
 
     let fixtures_dir = apps_dir.join(&app_name).join("fixtures");
-    std::fs::create_dir_all(&fixtures_dir).map_err(|e| (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json(json!({"error": format!("Failed to create fixtures dir: {}", e)})),
-    ))?;
+    std::fs::create_dir_all(&fixtures_dir).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": format!("Failed to create fixtures dir: {}", e)})),
+        )
+    })?;
 
     let file_path = fixtures_dir.join(format!("{}.json", slug));
     let pretty = serde_json::to_string_pretty(&docs).unwrap_or_default();
-    std::fs::write(&file_path, &pretty).map_err(|e| (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json(json!({"error": format!("Failed to write file: {}", e)})),
-    ))?;
+    std::fs::write(&file_path, &pretty).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": format!("Failed to write file: {}", e)})),
+        )
+    })?;
 
-    tracing::info!("Exported {} {} fixture(s) to {:?}", docs.len(), doctype, file_path);
+    tracing::info!(
+        "Exported {} {} fixture(s) to {:?}",
+        docs.len(),
+        doctype,
+        file_path
+    );
 
     Ok(Json(json!({
         "message": format!("Exported {} record(s) to fixtures/{}.json", docs.len(), slug),
@@ -493,5 +517,8 @@ fn error_response(e: &loom_core::LoomError) -> (StatusCode, Json<Value>) {
         loom_core::LoomError::Script(_) => StatusCode::INTERNAL_SERVER_ERROR,
         _ => StatusCode::INTERNAL_SERVER_ERROR,
     };
-    (status, Json(json!({"error": e.to_string(), "error_type": e.error_type()})))
+    (
+        status,
+        Json(json!({"error": e.to_string(), "error_type": e.error_type()})),
+    )
 }

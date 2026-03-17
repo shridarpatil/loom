@@ -14,7 +14,11 @@ pub struct Worker {
 }
 
 impl Worker {
-    pub fn new(pool: Arc<PgPool>, registry: Arc<loom_core::doctype::DocTypeRegistry>, queue_name: &str) -> Self {
+    pub fn new(
+        pool: Arc<PgPool>,
+        registry: Arc<loom_core::doctype::DocTypeRegistry>,
+        queue_name: &str,
+    ) -> Self {
         Self {
             pool,
             registry,
@@ -30,7 +34,13 @@ impl Worker {
         loop {
             match queue::dequeue(&self.pool, &self.queue_name).await {
                 Ok(Some(job)) => {
-                    tracing::info!("[{}] Processing job {} — {} (priority {})", self.queue_name, job.id, job.method, job.priority);
+                    tracing::info!(
+                        "[{}] Processing job {} — {} (priority {})",
+                        self.queue_name,
+                        job.id,
+                        job.method,
+                        job.priority
+                    );
                     self.execute_job(&job).await;
                 }
                 Ok(None) => {
@@ -99,9 +109,10 @@ impl Worker {
         let loom_map = rhai::Dynamic::from(rhai::Map::new());
         let mut scope = rhai::Scope::new();
 
-        let result: Result<rhai::Dynamic, Box<rhai::EvalAltResult>> = tokio::task::block_in_place(|| {
-            engine.call_fn::<rhai::Dynamic>(&mut scope, &ast, "main", (params, loom_map))
-        });
+        let result: Result<rhai::Dynamic, Box<rhai::EvalAltResult>> =
+            tokio::task::block_in_place(|| {
+                engine.call_fn::<rhai::Dynamic>(&mut scope, &ast, "main", (params, loom_map))
+            });
 
         match result {
             Ok(_) => {
@@ -111,7 +122,14 @@ impl Worker {
             Err(e) => {
                 let err = e.to_string();
                 let can_retry = job.attempts < job.max_retries;
-                tracing::error!("[{}] Job {} failed (attempt {}/{}): {}", self.queue_name, job.id, job.attempts, job.max_retries, err);
+                tracing::error!(
+                    "[{}] Job {} failed (attempt {}/{}): {}",
+                    self.queue_name,
+                    job.id,
+                    job.attempts,
+                    job.max_retries,
+                    err
+                );
                 let _ = queue::mark_failed(&self.pool, job.id, &err, can_retry).await;
             }
         }

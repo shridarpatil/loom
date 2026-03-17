@@ -12,7 +12,13 @@ pub fn register_db_api(
     user: String,
     roles: Vec<String>,
 ) {
-    register_core_api(engine, pool.clone(), registry.clone(), user.clone(), roles.clone());
+    register_core_api(
+        engine,
+        pool.clone(),
+        registry.clone(),
+        user.clone(),
+        roles.clone(),
+    );
 
     // loom_call — only in the outer version (not inner, to prevent infinite recursion)
     {
@@ -118,24 +124,30 @@ fn register_db_read_api(engine: &mut Engine, pool: Arc<PgPool>, registry: Arc<Do
     // get_doc
     {
         let pool = pool.clone();
-        engine.register_fn("loom_db_get_doc", move |doctype: &str, name: &str| -> Dynamic {
-            let pool = pool.clone();
-            let doctype = doctype.to_string();
-            let name = name.to_string();
-            block_on(async move {
-                let table = crate::doctype::meta::doctype_table_name(&doctype);
-                let sql = format!("SELECT row_to_json(t.*) FROM \"{}\" t WHERE t.id = $1", table);
-                let row: Option<serde_json::Value> = sqlx::query_scalar(&sql)
-                    .bind(&name)
-                    .fetch_optional(pool.as_ref())
-                    .await
-                    .unwrap_or(None);
-                match row {
-                    Some(val) => rhai::serde::to_dynamic(&val).unwrap_or(Dynamic::UNIT),
-                    None => Dynamic::UNIT,
-                }
-            })
-        });
+        engine.register_fn(
+            "loom_db_get_doc",
+            move |doctype: &str, name: &str| -> Dynamic {
+                let pool = pool.clone();
+                let doctype = doctype.to_string();
+                let name = name.to_string();
+                block_on(async move {
+                    let table = crate::doctype::meta::doctype_table_name(&doctype);
+                    let sql = format!(
+                        "SELECT row_to_json(t.*) FROM \"{}\" t WHERE t.id = $1",
+                        table
+                    );
+                    let row: Option<serde_json::Value> = sqlx::query_scalar(&sql)
+                        .bind(&name)
+                        .fetch_optional(pool.as_ref())
+                        .await
+                        .unwrap_or(None);
+                    match row {
+                        Some(val) => rhai::serde::to_dynamic(&val).unwrap_or(Dynamic::UNIT),
+                        None => Dynamic::UNIT,
+                    }
+                })
+            },
+        );
     }
 
     // get_value
@@ -150,7 +162,14 @@ fn register_db_read_api(engine: &mut Engine, pool: Arc<PgPool>, registry: Arc<Do
                 let filters_val: serde_json::Value =
                     rhai::serde::from_dynamic(&filters).unwrap_or(serde_json::Value::Null);
                 block_on(async move {
-                    match crate::db::engine::get_value(pool.as_ref(), &doctype, &filters_val, &fieldname).await {
+                    match crate::db::engine::get_value(
+                        pool.as_ref(),
+                        &doctype,
+                        &filters_val,
+                        &fieldname,
+                    )
+                    .await
+                    {
                         Ok(Some(val)) => rhai::serde::to_dynamic(&val).unwrap_or(Dynamic::UNIT),
                         _ => Dynamic::UNIT,
                     }
@@ -163,92 +182,147 @@ fn register_db_read_api(engine: &mut Engine, pool: Arc<PgPool>, registry: Arc<Do
     {
         let pool = pool.clone();
         let registry = registry.clone();
-        engine.register_fn("loom_db_get_all", move |doctype: &str, options: Dynamic| -> Dynamic {
-            let pool = pool.clone();
-            let registry = registry.clone();
-            let doctype = doctype.to_string();
-            let opts: serde_json::Value =
-                rhai::serde::from_dynamic(&options).unwrap_or(serde_json::Value::Object(Default::default()));
-            block_on(async move {
-                let meta = match registry.get_meta(&doctype).await {
-                    Ok(m) => m,
-                    Err(e) => { tracing::error!("loom_db_get_all: {}", e); return Dynamic::from(Vec::<Dynamic>::new()); }
-                };
-                let filters = opts.get("filters");
-                let order_by = opts.get("order_by").and_then(|v| v.as_str());
-                let limit = opts.get("limit").and_then(|v| v.as_u64()).map(|v| v as u32);
-                let field_strs: Option<Vec<String>> = opts.get("fields").and_then(|v| {
-                    v.as_array().map(|arr| arr.iter().filter_map(|f| f.as_str().map(String::from)).collect())
-                });
-                let field_refs: Option<Vec<&str>> = field_strs.as_ref().map(|v| v.iter().map(|s| s.as_str()).collect());
-                match crate::doctype::crud::get_list(pool.as_ref(), &meta, filters, field_refs.as_deref(), order_by, limit, None, None).await {
-                    Ok(rows) => Dynamic::from(rows.into_iter().filter_map(|v| rhai::serde::to_dynamic(&v).ok()).collect::<Vec<Dynamic>>()),
-                    Err(e) => { tracing::error!("loom_db_get_all error: {}", e); Dynamic::from(Vec::<Dynamic>::new()) }
-                }
-            })
-        });
+        engine.register_fn(
+            "loom_db_get_all",
+            move |doctype: &str, options: Dynamic| -> Dynamic {
+                let pool = pool.clone();
+                let registry = registry.clone();
+                let doctype = doctype.to_string();
+                let opts: serde_json::Value = rhai::serde::from_dynamic(&options)
+                    .unwrap_or(serde_json::Value::Object(Default::default()));
+                block_on(async move {
+                    let meta = match registry.get_meta(&doctype).await {
+                        Ok(m) => m,
+                        Err(e) => {
+                            tracing::error!("loom_db_get_all: {}", e);
+                            return Dynamic::from(Vec::<Dynamic>::new());
+                        }
+                    };
+                    let filters = opts.get("filters");
+                    let order_by = opts.get("order_by").and_then(|v| v.as_str());
+                    let limit = opts.get("limit").and_then(|v| v.as_u64()).map(|v| v as u32);
+                    let field_strs: Option<Vec<String>> = opts.get("fields").and_then(|v| {
+                        v.as_array().map(|arr| {
+                            arr.iter()
+                                .filter_map(|f| f.as_str().map(String::from))
+                                .collect()
+                        })
+                    });
+                    let field_refs: Option<Vec<&str>> = field_strs
+                        .as_ref()
+                        .map(|v| v.iter().map(|s| s.as_str()).collect());
+                    match crate::doctype::crud::get_list(
+                        pool.as_ref(),
+                        &meta,
+                        filters,
+                        field_refs.as_deref(),
+                        order_by,
+                        limit,
+                        None,
+                        None,
+                    )
+                    .await
+                    {
+                        Ok(rows) => Dynamic::from(
+                            rows.into_iter()
+                                .filter_map(|v| rhai::serde::to_dynamic(&v).ok())
+                                .collect::<Vec<Dynamic>>(),
+                        ),
+                        Err(e) => {
+                            tracing::error!("loom_db_get_all error: {}", e);
+                            Dynamic::from(Vec::<Dynamic>::new())
+                        }
+                    }
+                })
+            },
+        );
     }
 
     // exists
     {
         let pool = pool.clone();
-        engine.register_fn("loom_db_exists", move |doctype: &str, filters: Dynamic| -> bool {
-            let pool = pool.clone();
-            let doctype = doctype.to_string();
-            let filters_val: serde_json::Value =
-                rhai::serde::from_dynamic(&filters).unwrap_or(serde_json::Value::Null);
-            block_on(async move {
-                crate::db::engine::exists(pool.as_ref(), &doctype, &filters_val).await.unwrap_or(false)
-            })
-        });
+        engine.register_fn(
+            "loom_db_exists",
+            move |doctype: &str, filters: Dynamic| -> bool {
+                let pool = pool.clone();
+                let doctype = doctype.to_string();
+                let filters_val: serde_json::Value =
+                    rhai::serde::from_dynamic(&filters).unwrap_or(serde_json::Value::Null);
+                block_on(async move {
+                    crate::db::engine::exists(pool.as_ref(), &doctype, &filters_val)
+                        .await
+                        .unwrap_or(false)
+                })
+            },
+        );
     }
 
     // count
     {
         let pool = pool.clone();
-        engine.register_fn("loom_db_count", move |doctype: &str, filters: Dynamic| -> i64 {
-            let pool = pool.clone();
-            let doctype = doctype.to_string();
-            let filters_val: serde_json::Value =
-                rhai::serde::from_dynamic(&filters).unwrap_or(serde_json::Value::Null);
-            block_on(async move {
-                crate::db::engine::count(pool.as_ref(), &doctype, Some(&filters_val)).await.unwrap_or(0)
-            })
-        });
+        engine.register_fn(
+            "loom_db_count",
+            move |doctype: &str, filters: Dynamic| -> i64 {
+                let pool = pool.clone();
+                let doctype = doctype.to_string();
+                let filters_val: serde_json::Value =
+                    rhai::serde::from_dynamic(&filters).unwrap_or(serde_json::Value::Null);
+                block_on(async move {
+                    crate::db::engine::count(pool.as_ref(), &doctype, Some(&filters_val))
+                        .await
+                        .unwrap_or(0)
+                })
+            },
+        );
     }
 
     // sql (read-only)
     {
         let pool = pool.clone();
-        engine.register_fn("loom_db_sql", move |query: &str, params: Dynamic| -> Dynamic {
-            let pool = pool.clone();
-            let query = query.to_string();
-            let params_val: serde_json::Value =
-                rhai::serde::from_dynamic(&params).unwrap_or(serde_json::Value::Array(vec![]));
+        engine.register_fn(
+            "loom_db_sql",
+            move |query: &str, params: Dynamic| -> Dynamic {
+                let pool = pool.clone();
+                let query = query.to_string();
+                let params_val: serde_json::Value =
+                    rhai::serde::from_dynamic(&params).unwrap_or(serde_json::Value::Array(vec![]));
 
-            let trimmed = query.trim_start().to_uppercase();
-            if !trimmed.starts_with("SELECT") {
-                tracing::error!("loom_db_sql: only SELECT queries are allowed");
-                return Dynamic::from(Vec::<Dynamic>::new());
-            }
-
-            block_on(async move {
-                let bind_vals: Vec<String> = match params_val.as_array() {
-                    Some(arr) => arr.iter().map(|v| match v {
-                        serde_json::Value::String(s) => s.clone(),
-                        other => other.to_string(),
-                    }).collect(),
-                    None => vec![],
-                };
-                let wrapped = format!("SELECT row_to_json(t) FROM ({}) t", query);
-                let mut q = sqlx::query_scalar::<_, serde_json::Value>(&wrapped);
-                for val in &bind_vals { q = q.bind(val); }
-                match q.fetch_all(pool.as_ref()).await {
-                    Ok(rows) => Dynamic::from(rows.into_iter().filter_map(|v| rhai::serde::to_dynamic(&v).ok()).collect::<Vec<Dynamic>>()),
-                    Err(e) => { tracing::error!("loom_db_sql error: {}", e); Dynamic::from(Vec::<Dynamic>::new()) }
+                let trimmed = query.trim_start().to_uppercase();
+                if !trimmed.starts_with("SELECT") {
+                    tracing::error!("loom_db_sql: only SELECT queries are allowed");
+                    return Dynamic::from(Vec::<Dynamic>::new());
                 }
-            })
-        });
+
+                block_on(async move {
+                    let bind_vals: Vec<String> = match params_val.as_array() {
+                        Some(arr) => arr
+                            .iter()
+                            .map(|v| match v {
+                                serde_json::Value::String(s) => s.clone(),
+                                other => other.to_string(),
+                            })
+                            .collect(),
+                        None => vec![],
+                    };
+                    let wrapped = format!("SELECT row_to_json(t) FROM ({}) t", query);
+                    let mut q = sqlx::query_scalar::<_, serde_json::Value>(&wrapped);
+                    for val in &bind_vals {
+                        q = q.bind(val);
+                    }
+                    match q.fetch_all(pool.as_ref()).await {
+                        Ok(rows) => Dynamic::from(
+                            rows.into_iter()
+                                .filter_map(|v| rhai::serde::to_dynamic(&v).ok())
+                                .collect::<Vec<Dynamic>>(),
+                        ),
+                        Err(e) => {
+                            tracing::error!("loom_db_sql error: {}", e);
+                            Dynamic::from(Vec::<Dynamic>::new())
+                        }
+                    }
+                })
+            },
+        );
     }
 }
 
@@ -256,22 +330,34 @@ fn register_db_read_api(engine: &mut Engine, pool: Arc<PgPool>, registry: Arc<Do
 // DB Writes
 // =========================================================================
 
-fn register_db_write_api(engine: &mut Engine, pool: Arc<PgPool>, registry: Arc<DocTypeRegistry>, user: String) {
+fn register_db_write_api(
+    engine: &mut Engine,
+    pool: Arc<PgPool>,
+    registry: Arc<DocTypeRegistry>,
+    user: String,
+) {
     // set_value
     {
         let pool = pool.clone();
-        engine.register_fn("loom_db_set_value", move |doctype: &str, name: &str, field: &str, value: Dynamic| {
-            let pool = pool.clone();
-            let doctype = doctype.to_string();
-            let name = name.to_string();
-            let field = field.to_string();
-            let val: serde_json::Value = rhai::serde::from_dynamic(&value).unwrap_or(serde_json::Value::Null);
-            block_on(async move {
-                if let Err(e) = crate::db::engine::set_value(pool.as_ref(), &doctype, &name, &field, &val).await {
-                    tracing::error!("loom_db_set_value error: {}", e);
-                }
-            });
-        });
+        engine.register_fn(
+            "loom_db_set_value",
+            move |doctype: &str, name: &str, field: &str, value: Dynamic| {
+                let pool = pool.clone();
+                let doctype = doctype.to_string();
+                let name = name.to_string();
+                let field = field.to_string();
+                let val: serde_json::Value =
+                    rhai::serde::from_dynamic(&value).unwrap_or(serde_json::Value::Null);
+                block_on(async move {
+                    if let Err(e) =
+                        crate::db::engine::set_value(pool.as_ref(), &doctype, &name, &field, &val)
+                            .await
+                    {
+                        tracing::error!("loom_db_set_value error: {}", e);
+                    }
+                });
+            },
+        );
     }
 
     // add_value
@@ -302,21 +388,55 @@ fn register_db_write_api(engine: &mut Engine, pool: Arc<PgPool>, registry: Arc<D
             let pool = pool.clone();
             let registry = registry.clone();
             let user = user.clone();
-            let mut doc_val: serde_json::Value = rhai::serde::from_dynamic(&doc).unwrap_or(serde_json::Value::Null);
+            let mut doc_val: serde_json::Value =
+                rhai::serde::from_dynamic(&doc).unwrap_or(serde_json::Value::Null);
             block_on(async move {
-                let doctype = doc_val.get("doctype").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                if doctype.is_empty() { tracing::error!("loom_db_insert: missing doctype field"); return Dynamic::UNIT; }
-                if let Some(o) = doc_val.as_object_mut() { o.remove("doctype"); }
-                let meta = match registry.get_meta(&doctype).await { Ok(m) => m, Err(e) => { tracing::error!("loom_db_insert: {}", e); return Dynamic::UNIT; } };
-                if doc_val.get("id").and_then(|v| v.as_str()).unwrap_or("").is_empty() {
-                    match crate::doctype::naming::resolve_name(&meta, &doc_val, pool.as_ref()).await {
-                        Ok(name) => { if let Some(o) = doc_val.as_object_mut() { o.insert("id".to_string(), serde_json::Value::String(name)); } }
-                        Err(e) => { tracing::error!("loom_db_insert naming error: {}", e); return Dynamic::UNIT; }
+                let doctype = doc_val
+                    .get("doctype")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                if doctype.is_empty() {
+                    tracing::error!("loom_db_insert: missing doctype field");
+                    return Dynamic::UNIT;
+                }
+                if let Some(o) = doc_val.as_object_mut() {
+                    o.remove("doctype");
+                }
+                let meta = match registry.get_meta(&doctype).await {
+                    Ok(m) => m,
+                    Err(e) => {
+                        tracing::error!("loom_db_insert: {}", e);
+                        return Dynamic::UNIT;
+                    }
+                };
+                if doc_val
+                    .get("id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .is_empty()
+                {
+                    match crate::doctype::naming::resolve_name(&meta, &doc_val, pool.as_ref()).await
+                    {
+                        Ok(name) => {
+                            if let Some(o) = doc_val.as_object_mut() {
+                                o.insert("id".to_string(), serde_json::Value::String(name));
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!("loom_db_insert naming error: {}", e);
+                            return Dynamic::UNIT;
+                        }
                     }
                 }
-                match crate::doctype::crud::insert_doc(pool.as_ref(), &meta, &mut doc_val, &user).await {
+                match crate::doctype::crud::insert_doc(pool.as_ref(), &meta, &mut doc_val, &user)
+                    .await
+                {
                     Ok(result) => rhai::serde::to_dynamic(&result).unwrap_or(Dynamic::UNIT),
-                    Err(e) => { tracing::error!("loom_db_insert error: {}", e); Dynamic::UNIT }
+                    Err(e) => {
+                        tracing::error!("loom_db_insert error: {}", e);
+                        Dynamic::UNIT
+                    }
                 }
             })
         });
@@ -344,24 +464,38 @@ fn register_db_write_api(engine: &mut Engine, pool: Arc<PgPool>, registry: Arc<D
 // Permissions
 // =========================================================================
 
-fn register_permission_api(engine: &mut Engine, registry: Arc<DocTypeRegistry>, user: String, roles: Vec<String>) {
+fn register_permission_api(
+    engine: &mut Engine,
+    registry: Arc<DocTypeRegistry>,
+    user: String,
+    roles: Vec<String>,
+) {
     // has_permission
     {
         let registry = registry.clone();
         let user = user.clone();
         let roles = roles.clone();
-        engine.register_fn("loom_has_permission", move |doctype: &str, ptype: &str| -> bool {
-            let registry = registry.clone();
-            let user = user.clone();
-            let roles = roles.clone();
-            let doctype = doctype.to_string();
-            let ptype = ptype.to_string();
-            block_on(async move {
-                let meta = match registry.get_meta(&doctype).await { Ok(m) => m, Err(_) => return false };
-                let pt = match parse_perm_type(&ptype) { Some(p) => p, None => return false };
-                crate::perms::has_permission(&meta, None, pt, &user, &roles)
-            })
-        });
+        engine.register_fn(
+            "loom_has_permission",
+            move |doctype: &str, ptype: &str| -> bool {
+                let registry = registry.clone();
+                let user = user.clone();
+                let roles = roles.clone();
+                let doctype = doctype.to_string();
+                let ptype = ptype.to_string();
+                block_on(async move {
+                    let meta = match registry.get_meta(&doctype).await {
+                        Ok(m) => m,
+                        Err(_) => return false,
+                    };
+                    let pt = match parse_perm_type(&ptype) {
+                        Some(p) => p,
+                        None => return false,
+                    };
+                    crate::perms::has_permission(&meta, None, pt, &user, &roles)
+                })
+            },
+        );
     }
 
     // check_permission
@@ -369,18 +503,30 @@ fn register_permission_api(engine: &mut Engine, registry: Arc<DocTypeRegistry>, 
         let registry = registry.clone();
         let user = user.clone();
         let roles = roles.clone();
-        engine.register_fn("loom_check_permission", move |doctype: &str, ptype: &str| -> Result<(), Box<rhai::EvalAltResult>> {
-            let registry = registry.clone();
-            let user = user.clone();
-            let roles = roles.clone();
-            let doctype = doctype.to_string();
-            let ptype = ptype.to_string();
-            block_on(async move {
-                let meta = match registry.get_meta(&doctype).await { Ok(m) => m, Err(e) => return Err(e.to_string().into()) };
-                let pt = match parse_perm_type(&ptype) { Some(p) => p, None => return Err(format!("Unknown permission type: {}", ptype).into()) };
-                match crate::perms::check_permission(&meta, None, pt, &user, &roles) { Ok(()) => Ok(()), Err(e) => Err(e.to_string().into()) }
-            })
-        });
+        engine.register_fn(
+            "loom_check_permission",
+            move |doctype: &str, ptype: &str| -> Result<(), Box<rhai::EvalAltResult>> {
+                let registry = registry.clone();
+                let user = user.clone();
+                let roles = roles.clone();
+                let doctype = doctype.to_string();
+                let ptype = ptype.to_string();
+                block_on(async move {
+                    let meta = match registry.get_meta(&doctype).await {
+                        Ok(m) => m,
+                        Err(e) => return Err(e.to_string().into()),
+                    };
+                    let pt = match parse_perm_type(&ptype) {
+                        Some(p) => p,
+                        None => return Err(format!("Unknown permission type: {}", ptype).into()),
+                    };
+                    match crate::perms::check_permission(&meta, None, pt, &user, &roles) {
+                        Ok(()) => Ok(()),
+                        Err(e) => Err(e.to_string().into()),
+                    }
+                })
+            },
+        );
     }
 }
 
@@ -391,7 +537,9 @@ fn register_permission_api(engine: &mut Engine, registry: Arc<DocTypeRegistry>, 
 fn register_date_api(engine: &mut Engine) {
     engine.register_fn("loom_add_days", |date: &str, days: i64| -> String {
         match chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d") {
-            Ok(d) => (d + chrono::Duration::days(days)).format("%Y-%m-%d").to_string(),
+            Ok(d) => (d + chrono::Duration::days(days))
+                .format("%Y-%m-%d")
+                .to_string(),
             Err(_) => date.to_string(),
         }
     });
@@ -426,9 +574,12 @@ fn register_enqueue_api(engine: &mut Engine, pool: Arc<PgPool>) {
     }
     {
         let pool = pool.clone();
-        engine.register_fn("loom_enqueue", move |method: &str, args: Dynamic, options: Dynamic| {
-            enqueue_job(pool.clone(), method, &args, options);
-        });
+        engine.register_fn(
+            "loom_enqueue",
+            move |method: &str, args: Dynamic, options: Dynamic| {
+                enqueue_job(pool.clone(), method, &args, options);
+            },
+        );
     }
 }
 
@@ -460,9 +611,19 @@ fn enqueue_job(pool: Arc<PgPool>, method: &str, args: &Dynamic, options: Dynamic
     let opts_val: serde_json::Value =
         rhai::serde::from_dynamic(&options).unwrap_or(serde_json::Value::Null);
 
-    let queue = opts_val.get("queue").and_then(|v| v.as_str()).unwrap_or("default").to_string();
-    let priority = opts_val.get("priority").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
-    let max_retries = opts_val.get("max_retries").and_then(|v| v.as_i64()).unwrap_or(3) as i32;
+    let queue = opts_val
+        .get("queue")
+        .and_then(|v| v.as_str())
+        .unwrap_or("default")
+        .to_string();
+    let priority = opts_val
+        .get("priority")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0) as i32;
+    let max_retries = opts_val
+        .get("max_retries")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(3) as i32;
 
     block_on(async {
         let result = sqlx::query(
@@ -478,7 +639,12 @@ fn enqueue_job(pool: Arc<PgPool>, method: &str, args: &Dynamic, options: Dynamic
         .await;
 
         match result {
-            Ok(_) => tracing::info!("Enqueued '{}' on queue '{}' (priority {})", method, queue, priority),
+            Ok(_) => tracing::info!(
+                "Enqueued '{}' on queue '{}' (priority {})",
+                method,
+                queue,
+                priority
+            ),
             Err(e) => tracing::error!("loom_enqueue error: {}", e),
         }
     });

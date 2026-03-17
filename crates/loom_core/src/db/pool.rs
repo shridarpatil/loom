@@ -38,11 +38,19 @@ impl PoolManager {
             .max_connections(self.max_connections)
             .connect(database_url)
             .await
-            .map_err(|e| LoomError::Internal(format!("Failed to connect to DB for site '{}': {}", site, e)))?;
+            .map_err(|e| {
+                LoomError::Internal(format!(
+                    "Failed to connect to DB for site '{}': {}",
+                    site, e
+                ))
+            })?;
 
         tracing::info!("Created connection pool for site '{}'", site);
 
-        self.pools.write().await.insert(site.to_string(), pool.clone());
+        self.pools
+            .write()
+            .await
+            .insert(site.to_string(), pool.clone());
         Ok(pool)
     }
 

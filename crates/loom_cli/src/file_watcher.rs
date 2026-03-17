@@ -2,12 +2,12 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
-use notify::{RecursiveMode, Watcher, Event, EventKind};
+use notify::{Event, EventKind, RecursiveMode, Watcher};
 use sqlx::PgPool;
 use tokio::sync::mpsc;
 
-use loom_core::doctype::{DocTypeRegistry, Meta, RhaiHookRunner};
 use loom_core::db::migrate::migrate_doctype;
+use loom_core::doctype::{DocTypeRegistry, Meta, RhaiHookRunner};
 
 /// Start watching `apps/` and `core_doctypes/` for file changes.
 /// On `.json` change: reload DocType + migrate table.
@@ -22,17 +22,18 @@ pub fn start_watcher(
     // Spawn the blocking file watcher thread
     std::thread::spawn(move || {
         let rt_tx = tx;
-        let mut watcher = match notify::recommended_watcher(move |res: Result<Event, notify::Error>| {
-            if let Ok(event) = res {
-                let _ = rt_tx.blocking_send(event);
-            }
-        }) {
-            Ok(w) => w,
-            Err(e) => {
-                tracing::error!("Failed to create file watcher: {}", e);
-                return;
-            }
-        };
+        let mut watcher =
+            match notify::recommended_watcher(move |res: Result<Event, notify::Error>| {
+                if let Ok(event) = res {
+                    let _ = rt_tx.blocking_send(event);
+                }
+            }) {
+                Ok(w) => w,
+                Err(e) => {
+                    tracing::error!("Failed to create file watcher: {}", e);
+                    return;
+                }
+            };
 
         // Watch apps/ and core_doctypes/
         for dir in &["apps", "core_doctypes"] {
@@ -156,7 +157,11 @@ async fn reload_script(hook_runner: &RhaiHookRunner, path: &Path) {
     }
 
     hook_runner.load_script(&doctype, source).await;
-    tracing::info!("[hot-reload] Reloaded script for '{}' from {:?}", doctype, path);
+    tracing::info!(
+        "[hot-reload] Reloaded script for '{}' from {:?}",
+        doctype,
+        path
+    );
 }
 
 async fn reload_client_script(pool: &PgPool, path: &Path) {
@@ -170,7 +175,10 @@ async fn reload_client_script(pool: &PgPool, path: &Path) {
 
     // Extract DocType name from path: .../doctypes/todo/todo.client.js → "todo"
     let filename = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
-    let slug = filename.strip_suffix(".client.js").unwrap_or("").to_string();
+    let slug = filename
+        .strip_suffix(".client.js")
+        .unwrap_or("")
+        .to_string();
     if slug.is_empty() {
         return;
     }
@@ -181,7 +189,10 @@ async fn reload_client_script(pool: &PgPool, path: &Path) {
         if json_path.exists() {
             if let Ok(content) = std::fs::read_to_string(&json_path) {
                 if let Ok(meta) = serde_json::from_str::<serde_json::Value>(&content) {
-                    meta.get("name").and_then(|v| v.as_str()).unwrap_or(&slug).to_string()
+                    meta.get("name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or(&slug)
+                        .to_string()
                 } else {
                     slug.clone()
                 }
@@ -206,5 +217,9 @@ async fn reload_client_script(pool: &PgPool, path: &Path) {
     .execute(pool)
     .await;
 
-    tracing::info!("[hot-reload] Reloaded client script for '{}' from {:?}", doctype_name, path);
+    tracing::info!(
+        "[hot-reload] Reloaded client script for '{}' from {:?}",
+        doctype_name,
+        path
+    );
 }
