@@ -53,6 +53,7 @@ const permissions = ref<DocPermMeta[]>([
   { role: "Administrator", permlevel: 0, read: true, write: true, create: true, delete: true, submit: false, cancel: false },
 ]);
 const saving = ref(false);
+const activeTab = ref<"settings" | "fields" | "permissions">("settings");
 const error = ref("");
 
 // Editing state for field detail panel
@@ -497,6 +498,27 @@ function removePermission(index: number) {
       </template>
     </LPageHeader>
 
+    <!-- Tabs -->
+    <div class="border-b border-border bg-white px-6 shrink-0">
+      <div class="flex gap-0">
+        <button
+          v-for="tab in [
+            { key: 'settings', label: 'Settings' },
+            { key: 'fields', label: `Fields${totalFieldCount > 0 ? ` (${totalFieldCount})` : ''}` },
+            { key: 'permissions', label: `Permissions${permissions.length > 0 ? ` (${permissions.length})` : ''}` },
+          ]"
+          :key="tab.key"
+          :class="[
+            'px-4 py-2.5 text-[13px] font-medium border-b-2 transition-colors -mb-px',
+            activeTab === tab.key
+              ? 'border-primary-600 text-primary-700'
+              : 'border-transparent text-text-muted hover:text-text hover:border-border',
+          ]"
+          @click="activeTab = tab.key as any"
+        >{{ tab.label }}</button>
+      </div>
+    </div>
+
     <div class="flex-1 overflow-auto">
       <div class="flex">
         <!-- Main area -->
@@ -505,7 +527,7 @@ function removePermission(index: number) {
           <LAlert v-if="error" type="error" dismissible @dismiss="error = ''">{{ error }}</LAlert>
 
           <!-- Settings -->
-          <div class="bg-surface border border-border rounded-xl overflow-hidden">
+          <div v-show="activeTab === 'settings'" class="bg-surface border border-border rounded-xl overflow-hidden">
             <div class="px-5 py-3 border-b border-border bg-surface-muted/30">
               <h3 class="text-[13px] font-semibold text-text-muted">Settings</h3>
             </div>
@@ -551,7 +573,7 @@ function removePermission(index: number) {
           </div>
 
           <!-- Fields — Section-based layout -->
-          <div class="space-y-3">
+          <div v-show="activeTab === 'fields'" class="space-y-3">
             <div class="flex items-center justify-between">
               <h3 class="text-[13px] font-semibold text-text-muted">
                 Fields
@@ -731,7 +753,7 @@ function removePermission(index: number) {
           </div>
 
           <!-- Permissions (hidden for child tables — they inherit from parent) -->
-          <div v-if="!isChildTable" class="bg-surface border border-border rounded-xl overflow-hidden">
+          <div v-if="!isChildTable" v-show="activeTab === 'permissions'" class="bg-surface border border-border rounded-xl overflow-hidden">
             <div class="px-5 py-3 border-b border-border bg-surface-muted/30 flex items-center justify-between">
               <h3 class="text-[13px] font-semibold text-text-muted">
                 Permissions

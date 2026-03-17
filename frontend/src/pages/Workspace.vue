@@ -105,20 +105,23 @@ async function toggleEditMode() {
       </template>
     </LPageHeader>
 
-    <div class="px-6 py-5">
+    <div class="px-6 py-6">
       <!-- Stats row -->
-      <div class="grid grid-cols-3 gap-3 mb-6">
-        <div class="bg-white border border-border rounded-lg px-4 py-3">
-          <div class="text-xl font-semibold">{{ recentCount }}</div>
-          <div class="text-[12px] text-text-muted">DocTypes</div>
+      <div class="grid grid-cols-3 gap-4 mb-8">
+        <div class="bg-white border border-border/60 rounded-xl px-5 py-4 shadow-sm shadow-black/[0.02]">
+          <div class="text-2xl font-bold text-text tracking-tight">{{ recentCount }}</div>
+          <div class="text-[12px] text-text-muted mt-0.5">DocTypes</div>
         </div>
-        <div class="bg-white border border-border rounded-lg px-4 py-3">
-          <div class="text-xl font-semibold text-emerald-600">Active</div>
-          <div class="text-[12px] text-text-muted">Server Status</div>
+        <div class="bg-white border border-border/60 rounded-xl px-5 py-4 shadow-sm shadow-black/[0.02]">
+          <div class="flex items-center gap-2">
+            <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span class="text-2xl font-bold text-emerald-600 tracking-tight">Active</span>
+          </div>
+          <div class="text-[12px] text-text-muted mt-0.5">Server Status</div>
         </div>
-        <div class="bg-white border border-border rounded-lg px-4 py-3">
-          <div class="text-xl font-semibold">{{ user }}</div>
-          <div class="text-[12px] text-text-muted">Logged in as</div>
+        <div class="bg-white border border-border/60 rounded-xl px-5 py-4 shadow-sm shadow-black/[0.02]">
+          <div class="text-2xl font-bold text-text tracking-tight truncate">{{ user }}</div>
+          <div class="text-[12px] text-text-muted mt-0.5">Logged in as</div>
         </div>
       </div>
 
@@ -155,12 +158,12 @@ async function toggleEditMode() {
 
       <!-- DocType list -->
       <div v-if="doctypes.length > 0">
-        <h2 class="text-[11px] font-semibold text-text-light uppercase tracking-wider mb-2">Your DocTypes</h2>
-        <div class="bg-white border border-border rounded-lg overflow-hidden">
+        <h2 class="text-[11px] font-semibold text-text-light/70 uppercase tracking-widest mb-3">Your DocTypes</h2>
+        <div class="bg-white border border-border/60 rounded-xl shadow-sm shadow-black/[0.02] overflow-hidden">
           <button
             v-for="dt in doctypes"
             :key="dt"
-            class="w-full flex items-center gap-2.5 px-4 py-2.5 text-left border-b border-border last:border-0 hover:bg-surface-muted/50 transition-colors"
+            class="w-full flex items-center gap-3 px-5 py-3 text-left border-b border-border/40 last:border-0 hover:bg-surface-muted/50 transition-all"
             @click="router.push(`/app/${dt}`)"
           >
             <span class="w-6 h-6 rounded bg-primary-50 flex items-center justify-center shrink-0 text-[10px] font-bold text-primary-600">

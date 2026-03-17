@@ -97,7 +97,7 @@ function isRequired(): boolean {
   return props.computedReqd ?? props.field.reqd ?? false;
 }
 
-const inputClass = "w-full h-8 px-2.5 text-[13px] border border-border rounded-md bg-white text-text placeholder-text-light focus:outline-none focus:ring-1 focus:ring-primary-500/30 focus:border-primary-400 disabled:bg-surface-raised disabled:text-text-muted disabled:cursor-not-allowed transition-colors";
+const inputClass = "w-full h-9 px-3 text-[13px] border border-border rounded-lg bg-white text-text placeholder-text-light focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400 disabled:bg-surface-muted disabled:text-text-muted disabled:cursor-not-allowed transition-all";
 </script>
 
 <template>
@@ -132,7 +132,7 @@ const inputClass = "w-full h-8 px-2.5 text-[13px] border border-border rounded-m
 
     <!-- DynamicLink — renders as a text input (the target DocType comes from another field) -->
     <template v-else-if="isDynamicLink()">
-      <label class="block text-[12px] font-medium text-text-muted mb-1">
+      <label class="block text-[12px] font-medium text-text-muted mb-1.5">
         {{ field.label || field.fieldname }}
         <span v-if="isRequired()" class="text-danger">*</span>
       </label>
@@ -170,7 +170,7 @@ const inputClass = "w-full h-8 px-2.5 text-[13px] border border-border rounded-m
 
     <!-- Other fields -->
     <template v-else>
-      <label class="block text-[12px] font-medium text-text-muted mb-1">
+      <label class="block text-[12px] font-medium text-text-muted mb-1.5">
         {{ field.label || field.fieldname }}
         <span v-if="isRequired()" class="text-danger">*</span>
       </label>

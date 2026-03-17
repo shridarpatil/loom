@@ -312,12 +312,21 @@ onUnmounted(() => socket.off("doc_update", onDocUpdate));
 
     <!-- Form -->
     <div v-else-if="meta" class="flex-1 overflow-auto">
-      <div class="px-6 py-4">
+      <div class="px-6 py-5">
         <!-- Doc info -->
-        <div v-if="!isNew" class="flex items-center gap-3 mb-4 text-[11px] text-text-light">
-          <span>ID: <span class="font-mono text-text-muted">{{ props.id }}</span></span>
-          <span v-if="doc.owner">Owner: <span class="text-text-muted">{{ doc.owner }}</span></span>
-          <span v-if="doc.modified">Modified: <span class="text-text-muted">{{ String(doc.modified).slice(0, 19) }}</span></span>
+        <div v-if="!isNew" class="flex items-center gap-4 mb-5 px-1 text-[11px] text-text-light">
+          <span class="flex items-center gap-1">
+            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 8.25h15m-16.5 7.5h15m-1.8-13.5-3.9 19.5m-2.1-19.5-3.9 19.5" /></svg>
+            <span class="font-mono text-text-muted">{{ props.id }}</span>
+          </span>
+          <span v-if="doc.owner" class="flex items-center gap-1">
+            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0" /></svg>
+            <span class="text-text-muted">{{ doc.owner }}</span>
+          </span>
+          <span v-if="doc.modified" class="flex items-center gap-1">
+            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+            <span class="text-text-muted">{{ String(doc.modified).slice(0, 19) }}</span>
+          </span>
         </div>
 
         <FormLayout

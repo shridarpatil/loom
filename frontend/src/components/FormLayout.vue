@@ -120,6 +120,22 @@ const sections = computed<Section[]>(() => {
   );
 });
 
+// Compute max width based on the maximum number of columns across all sections
+const maxColumns = computed(() => {
+  return Math.max(1, ...sections.value.map((s) => s.columns.length));
+});
+
+const formMaxWidth = computed(() => {
+  // ~320px per column
+  const widths: Record<number, string> = {
+    1: "640px",
+    2: "960px",
+    3: "1200px",
+    4: "1440px",
+  };
+  return widths[maxColumns.value] || `${maxColumns.value * 320}px`;
+});
+
 function toggleCollapse(si: number) {
   const s = new Set(collapsedSections.value);
   if (s.has(si)) {
@@ -148,28 +164,28 @@ function updateField(fieldname: string, value: unknown) {
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div class="space-y-5" :style="{ maxWidth: formMaxWidth, margin: '0 auto' }">
     <div
       v-for="(section, si) in sections"
       :key="si"
-      class="bg-white border border-border rounded-lg"
+      class="bg-white border border-border/60 rounded-xl shadow-sm shadow-black/[0.02] overflow-hidden"
     >
       <!-- Section header -->
       <div
         v-if="section.label"
         :class="[
-          'px-4 py-2 flex items-center justify-between',
-          collapsedSections.has(si) ? '' : 'border-b border-border',
-          section.collapsible ? 'cursor-pointer select-none hover:bg-surface-muted/30 transition-colors' : '',
+          'px-5 py-3 flex items-center justify-between',
+          collapsedSections.has(si) ? '' : 'border-b border-border/60',
+          section.collapsible ? 'cursor-pointer select-none hover:bg-surface-muted/40 transition-colors' : '',
         ]"
         @click="section.collapsible ? toggleCollapse(si) : undefined"
       >
-        <h3 class="text-[12px] font-semibold text-text-muted uppercase tracking-wide">{{ section.label }}</h3>
+        <h3 class="text-[13px] font-semibold text-text">{{ section.label }}</h3>
         <svg
           v-if="section.collapsible"
           :class="[
-            'w-4 h-4 text-text-light transition-transform duration-150',
-            collapsedSections.has(si) ? '' : 'rotate-180',
+            'w-4 h-4 text-text-light transition-transform duration-200',
+            collapsedSections.has(si) ? '-rotate-90' : '',
           ]"
           fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
         >
@@ -180,14 +196,14 @@ function updateField(fieldname: string, value: unknown) {
       <!-- Columns grid (hidden when collapsed) -->
       <div
         v-show="!collapsedSections.has(si)"
-        class="px-4 py-3"
+        class="px-5 py-4"
         :style="
           section.columns.length > 1
-            ? { display: 'grid', gridTemplateColumns: `repeat(${section.columns.length}, 1fr)`, gap: '1rem' }
+            ? { display: 'grid', gridTemplateColumns: `repeat(${section.columns.length}, 1fr)`, gap: '1.25rem' }
             : {}
         "
       >
-        <div v-for="(col, ci) in section.columns" :key="ci" class="space-y-3">
+        <div v-for="(col, ci) in section.columns" :key="ci" class="space-y-4">
           <template v-for="field in col.fields" :key="field.fieldname">
             <FieldControl
               v-if="isFieldVisible(field)"
