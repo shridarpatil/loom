@@ -141,7 +141,7 @@ pub async fn signup(
         .bind(&body.email)
         .fetch_one(&state.pool)
         .await
-        .unwrap_or(false);
+        .unwrap_or(false); // Gracefully handle if User table doesn't exist
 
     let exists_legacy: bool =
         sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM \"__user\" WHERE email = $1)")
@@ -198,7 +198,7 @@ async fn lookup_user(
 ) -> Option<(String, String, String, bool, Value)> {
     let user_table = loom_core::doctype::doctype_table_name("User");
 
-    // Try User DocType table
+    // Try User DocType table (gracefully handle if table doesn't exist yet)
     let select_sql = format!(
         "SELECT id, email, full_name, password_hash, roles_json FROM \"{}\" WHERE id = $1 OR email = $1",
         user_table
@@ -213,7 +213,7 @@ async fn lookup_user(
         .bind(email)
         .fetch_optional(pool)
         .await
-        .ok()?;
+        .unwrap_or(None);
 
     if let Some((id, _email_col, full_name, password_hash, roles_json)) = row {
         let password_hash = password_hash.unwrap_or_default();

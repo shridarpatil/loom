@@ -6,6 +6,7 @@ members = [
     "crates/loom_queue",
     "crates/loom_print",
     "crates/loom_cli",
+    "crates/loom_tests",
 ]
 
 [workspace.package]
@@ -69,6 +70,9 @@ regex = "1"
 async-trait = "0.1"
 futures-util = "0.3"
 notify = { version = "7", features = ["macos_fsevent"] }
+
+# HTTP body utilities (for tests)
+http-body-util = "0.1"
 
 # Internal crates
 loom_core = { path = "crates/loom_core" }

@@ -5,12 +5,25 @@ use super::meta::{FieldType, Meta, STANDARD_FIELDS};
 use crate::error::{LoomError, LoomResult};
 
 /// Insert a new document into the database using parameterized queries.
+/// Automatically generates `id` based on the DocType's naming rule if not already set.
 pub async fn insert_doc(
     pool: &PgPool,
     meta: &Meta,
     doc: &mut Value,
     user: &str,
 ) -> LoomResult<Value> {
+    // Auto-generate id if not provided
+    let has_id = doc
+        .get("id")
+        .and_then(|v| v.as_str())
+        .is_some_and(|s| !s.is_empty());
+    if !has_id {
+        let name = super::naming::resolve_name(meta, doc, pool).await?;
+        if let Some(obj) = doc.as_object_mut() {
+            obj.insert("id".to_string(), Value::String(name));
+        }
+    }
+
     validate_required_fields(meta, doc)?;
     set_standard_fields_on_insert(doc, user);
 

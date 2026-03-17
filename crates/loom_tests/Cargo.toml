@@ -1,0 +1,27 @@
+[package]
+name = "loom_tests"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+# This crate is only for integration tests — never published or used as a dep.
+
+[dependencies]
+loom_core.workspace = true
+loom_api.workspace = true
+loom_queue.workspace = true
+tokio.workspace = true
+sqlx.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+rhai.workspace = true
+axum.workspace = true
+tower = { workspace = true, features = ["util"] }
+tower-http.workspace = true
+async-trait.workspace = true
+http-body-util = "0.1"
