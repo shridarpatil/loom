@@ -34,16 +34,19 @@ open http://localhost:8000
 - **Fixture Export** — Export document records as JSON fixtures via CLI or hooks.toml declarations
 - **Realtime** — WebSocket pub/sub for live document updates across tabs/users
 - **Multi-tenant** — Each site has its own database and site_config.json
+- **App Workspaces** — Per-app home page with configurable icons and color themes
+- **Dashboard Widgets** — Number cards, shortcuts, and charts (bar, line, donut) on workspaces
+- **Context-Aware Sidebar** — Sidebar adapts to the current app, showing relevant modules and shortcuts
 - **App System** — Install 3rd party apps without a compiler
 
 ## Architecture
 
 ```
-Layer 3: Compiled Rust (framework core only)
-Layer 2: Rhai Scripts (hooks, validations, hot-reloadable)
-Layer 1: JSON DocTypes (data models — no compilation needed)
+Layer 2: Compiled Rust (framework core only)
+Layer 1: Rhai Scripts (hooks, validations, hot-reloadable)
+Layer 0: JSON DocTypes (data models — no compilation needed)
 ```
 
-Most apps only use Layers 1 and 2.
+Most apps only use Layers 0 and 1.
 
-*WASM plugins and email sending are planned for a future release.*
+*Email sending is planned for a future release.*

@@ -40,7 +40,7 @@ loom serve
 
 ## site_config.json
 
-Each site has a `sites/{site_name}/site_config.json` that stores database credentials and site settings. Commands like `loom serve` and `loom migrate` read this automatically, so you don't need to pass `--db-url` every time.
+Each site has a `sites/{site_name}/site_config.json` that stores database credentials and site settings. All CLI commands (`loom serve`, `loom migrate`, `loom console`, `loom worker`, `loom install-app`, `loom export-fixtures`, etc.) read from this file automatically — no `--db-url` flag is needed.
 
 ```json
 {

@@ -62,7 +62,7 @@ loom get-app /path/to/my_app.tar.gz
 
 ## `loom install-app`
 
-Install an app into the site (loads DocTypes, scripts, client scripts, fixtures, runs migrations).
+Install an app into the site. This runs the full `migrate` pipeline (DocTypes, scripts, client scripts, app configs) and then loads fixtures. There is no need to run `loom migrate` separately after install.
 
 ```bash
 loom --site mysite.localhost install-app my_app
@@ -70,7 +70,15 @@ loom --site mysite.localhost install-app my_app
 
 ## `loom migrate`
 
-Sync DocType definitions to database schema (creates/alters tables). Loads core DocTypes, app DocTypes, and seeds default users and roles.
+Sync DocType definitions to database schema (creates/alters tables). Also handles:
+
+- Core and app DocType loading and table migration
+- Server scripts (`.rhai`) — loaded into `__script`
+- Client scripts (`.client.js`) — loaded into `__customization`
+- App configs from `hooks.toml` — workspace entries, dashboard widgets, queues, scheduler, pages
+- Default user and role seeding
+
+After pulling app changes from git, running `loom migrate` is all that's needed to apply them.
 
 ```bash
 loom migrate [--site mysite.localhost]

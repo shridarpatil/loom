@@ -35,7 +35,19 @@ version = "1.0.0"
 title = "My Application"
 description = "A custom Loom app"
 modules = ["HR", "Payroll"]
+icon = "briefcase"        # Icon shown in the app switcher and workspace
+color = "#4f46e5"         # Accent color for the app workspace
 ```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `name` | yes | App identifier (snake_case) |
+| `version` | yes | Semver version string |
+| `title` | yes | Human-readable app name |
+| `description` | no | Short description |
+| `modules` | yes | List of modules this app provides |
+| `icon` | no | Icon name for app switcher and workspace header |
+| `color` | no | Hex color used as the app's accent color |
 
 ## hooks.toml
 
@@ -68,7 +80,95 @@ filters = { module = "HR" }
 route = "/app/org-chart"
 label = "Org Chart"
 component = "OrgChart"
+
+# Workspace sidebar entries
+[[workspace]]
+label = "HR"
+icon = "users"
+
+[[workspace]]
+label = "Payroll"
+icon = "wallet"
+
+# Dashboard widgets (appear on the app workspace)
+[[dashboard]]
+type = "shortcut"
+label = "New Employee"
+link = "/app/employee/new"
+icon = "user-plus"
+
+[[dashboard]]
+type = "number"
+label = "Active Employees"
+doctype = "Employee"
+filters = { status = "Active" }
+color = "#10b981"
+
+[[dashboard]]
+type = "chart"
+label = "Monthly Headcount"
+doctype = "Employee"
+chart_type = "line"
+field = "creation"
+span = "monthly"
+color = "#6366f1"
+
+[[dashboard]]
+type = "chart"
+label = "Department Distribution"
+doctype = "Employee"
+chart_type = "donut"
+field = "department"
+color = "#f59e0b"
 ```
+
+### Workspace Entries
+
+The `[[workspace]]` section defines sidebar entries for the app. Each entry appears in the context-aware sidebar when the user is inside the app.
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `label` | yes | Display name in the sidebar |
+| `icon` | no | Icon name for the sidebar entry |
+
+### Dashboard Widgets
+
+The `[[dashboard]]` section defines widgets shown on the app's workspace home page. Three widget types are supported:
+
+| Type | Description |
+|------|-------------|
+| `shortcut` | Quick-link button with a label, link, and optional icon |
+| `number` | Number card showing a count of documents matching filters |
+| `chart` | Chart visualization of document data |
+
+**Shortcut fields:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `label` | yes | Button text |
+| `link` | yes | URL to navigate to |
+| `icon` | no | Icon name |
+
+**Number card fields:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `label` | yes | Card title |
+| `doctype` | yes | DocType to count |
+| `filters` | no | Filter criteria |
+| `color` | no | Hex color for the card |
+
+**Chart fields:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `label` | yes | Chart title |
+| `doctype` | yes | DocType to query |
+| `chart_type` | yes | `bar`, `line`, or `donut` |
+| `field` | yes | Field to aggregate on |
+| `span` | no | Time grouping: `daily`, `weekly`, `monthly`, `yearly` (for bar/line charts) |
+| `direction` | no | `vertical` (default) or `horizontal` (bar charts only) |
+| `color` | no | Hex color for the chart |
 
 ## Installing an App
 

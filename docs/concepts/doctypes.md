@@ -40,6 +40,7 @@ A DocType is a data model definition. When you create a DocType, Loom automatica
 | Table | — | Child table (rows stored in child DocType's table) |
 | SectionBreak | — | Layout: section divider |
 | ColumnBreak | — | Layout: column divider |
+| TabBreak | — | Layout: organizes fields into tabs |
 
 ## Naming Rules
 

@@ -247,7 +247,7 @@ loom.on_change = function(fieldname, value, doc) {
 
 Client scripts are stored in the `__customization` table and served as part of the DocType meta response (`GET /api/doctype/{name}`). The frontend evaluates them when the form or list view mounts.
 
-In developer mode, saving a `.client.js` file triggers an automatic reload into the database.
+Client scripts are synced from `.client.js` files to the database by `loom migrate` (and `loom install-app`, which runs migrate internally). In developer mode, saving a `.client.js` file also triggers an automatic reload into the database without restarting the server.
 
 ## Sandbox Limits
 
