@@ -12,7 +12,7 @@ members = [
 [workspace.package]
 edition = "2021"
 rust-version = "1.75"
-license = "MIT"
+license = "AGPL-3.0"
 
 [workspace.dependencies]
 # Async
