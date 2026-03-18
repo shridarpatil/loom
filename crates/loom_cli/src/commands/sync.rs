@@ -200,7 +200,7 @@ pub async fn refresh_app_configs(pool: &PgPool, apps_dir: &Path) -> anyhow::Resu
                 .parse()
                 .unwrap_or(toml::Value::Table(Default::default()));
             (
-                parse_toml_array(&hooks, "workspace", &["label", "route", "icon"]),
+                parse_toml_array(&hooks, "workspace", &["label", "route", "icon", "display"]),
                 parse_toml_array(
                     &hooks,
                     "dashboard",

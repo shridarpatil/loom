@@ -14,6 +14,7 @@ interface WorkspaceItem {
   label: string;
   route: string;
   icon?: string;
+  display?: "icons" | "sidebar" | "both";
 }
 
 interface AppInfo {
@@ -56,7 +57,6 @@ const currentApp = computed<AppInfo | null>(() => {
   }
 
   // Check if path matches a DocType that belongs to an app's module
-  // e.g., /app/Todo → Todo module → loom_todo app
   const pathParts = path.split("/");
   if (pathParts.length >= 3 && pathParts[1] === "app") {
     const dtName = decodeURIComponent(pathParts[2]);
@@ -70,15 +70,29 @@ const currentApp = computed<AppInfo | null>(() => {
     }
   }
 
+  // Check if path matches any workspace item's route in an app
+  // e.g., /app/report-builder or /app/role-permission-manager
+  for (const app of installedApps.value) {
+    if (app.workspace) {
+      for (const item of app.workspace) {
+        if (path === item.route || path.startsWith(item.route + "/")) {
+          return app;
+        }
+      }
+    }
+  }
+
   return null;
 });
 
 const isHome = computed(() => route.path === "/app");
 
-// Sidebar items: app workspace items when inside an app, empty on home
+// Sidebar items: filtered by display mode (show if "sidebar" or "both" or unset)
 const sidebarItems = computed<WorkspaceItem[]>(() => {
   if (currentApp.value?.workspace) {
-    return currentApp.value.workspace;
+    return currentApp.value.workspace.filter(
+      (item) => !item.display || item.display === "both" || item.display === "sidebar"
+    );
   }
   return [];
 });
@@ -122,65 +136,27 @@ onMounted(async () => {
 <template>
   <aside
     :class="[
-      'h-screen bg-white border-r border-border flex flex-col transition-all duration-200 select-none shrink-0',
+      'h-full bg-white border-r border-border flex flex-col transition-all duration-200 select-none shrink-0',
       collapsed ? 'w-[52px]' : 'w-[220px]',
     ]"
   >
-    <!-- Header -->
-    <div class="flex items-center h-12 px-3 shrink-0 border-b border-border/60">
-      <button
-        class="flex items-center justify-center w-7 h-7 rounded-lg hover:bg-surface-raised text-text-muted transition-all"
-        @click="collapsed = !collapsed"
-        title="Toggle sidebar"
-      >
-        <svg class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-        </svg>
-      </button>
-      <template v-if="!collapsed">
-        <!-- Show app title when inside an app, brand when on home -->
-        <template v-if="currentApp">
-          <button
-            class="ml-2 flex items-center gap-1.5 hover:opacity-80 transition-opacity"
-            @click="navigate('/app')"
-            title="Back to Home"
-          >
-            <div
-              class="w-5 h-5 rounded-md flex items-center justify-center"
-              :style="{ backgroundColor: (currentApp.color || '#6366f1') + '18', color: currentApp.color || '#6366f1' }"
-            >
-              <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" :d="getIconPath(currentApp.icon)" />
-              </svg>
-            </div>
-            <span class="font-bold text-[14px] tracking-tight text-text">{{ currentApp.title }}</span>
-          </button>
-        </template>
-        <template v-else>
-          <img v-if="theme.logo_url" :src="theme.logo_url" :alt="theme.brand_name" class="ml-2 h-5" />
-          <span v-else class="ml-2 font-bold text-[14px] tracking-tight text-primary-600">
-            {{ theme.brand_name }}
-          </span>
-        </template>
-      </template>
-    </div>
-
     <!-- Navigation -->
-    <nav class="flex-1 overflow-y-auto px-2 py-2 space-y-0.5">
-      <!-- Home link (always shown) -->
+    <nav class="flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
+      <!-- App workspace link — goes to current app's workspace, not global home -->
       <button
+        v-if="currentApp"
         :class="[
           'w-full flex items-center gap-2.5 px-2.5 py-[7px] text-[13px] rounded-lg transition-all duration-150',
-          isHome
+          route.path === `/app/${currentApp.name}`
             ? 'bg-primary-50 text-primary-700 font-medium shadow-sm shadow-primary-100'
             : 'text-text-muted hover:bg-surface-muted hover:text-text'
         ]"
-        @click="navigate('/app')"
+        @click="navigate(`/app/${currentApp.name}`)"
       >
         <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
           <path stroke-linecap="round" stroke-linejoin="round" :d="iconPaths.home" />
         </svg>
-        <span v-if="!collapsed">Home</span>
+        <span v-if="!collapsed">{{ currentApp.title }}</span>
       </button>
 
       <!-- Divider when inside an app -->
@@ -213,24 +189,19 @@ onMounted(async () => {
       </div>
     </nav>
 
-    <!-- Footer -->
-    <div class="px-2 py-2 border-t border-border/60 shrink-0">
-      <div class="flex items-center gap-2 px-1.5 py-1">
-        <div class="w-6 h-6 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center shrink-0 shadow-sm">
-          <span class="text-[10px] font-bold text-white">{{ user.charAt(0).toUpperCase() }}</span>
-        </div>
-        <span v-if="!collapsed" class="text-[12px] text-text-muted truncate flex-1">{{ user }}</span>
-        <button
-          v-if="!collapsed"
-          class="p-1 rounded-md text-text-light hover:text-text hover:bg-surface-raised transition-all shrink-0"
-          title="Sign out"
-          @click="doLogout"
-        >
-          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
-          </svg>
-        </button>
-      </div>
+    <!-- Collapse toggle at bottom -->
+    <div class="px-2 py-2 shrink-0">
+      <button
+        class="w-full flex items-center justify-center gap-2 px-2.5 py-[6px] text-[12px] text-text-light hover:text-text-muted hover:bg-surface-muted rounded-lg transition-all"
+        @click="collapsed = !collapsed"
+        :title="collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+      >
+        <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <path v-if="collapsed" stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+          <path v-else stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+        </svg>
+        <span v-if="!collapsed">Collapse</span>
+      </button>
     </div>
   </aside>
 </template>

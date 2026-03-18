@@ -1,21 +1,30 @@
 <script setup lang="ts">
+import { onMounted, ref } from "vue";
+
 defineProps<{
   title: string;
   subtitle?: string;
 }>();
+
+const mounted = ref(false);
+onMounted(() => {
+  mounted.value = true;
+});
 </script>
 
 <template>
-  <div class="sticky top-0 z-10 border-b border-border bg-white/80 backdrop-blur-xl px-6 py-3 shrink-0">
-    <div class="flex items-center justify-between gap-4">
-      <div class="min-w-0">
-        <slot name="breadcrumb" />
-        <h1 class="text-[16px] font-semibold tracking-tight truncate text-text">{{ title }}</h1>
-        <p v-if="subtitle" class="text-[12px] text-text-muted mt-0.5">{{ subtitle }}</p>
-      </div>
-      <div class="flex items-center gap-2 shrink-0">
-        <slot name="actions" />
-      </div>
+  <!-- Teleport page title into navbar left section -->
+  <Teleport v-if="mounted" to="#navbar-page-header">
+    <div class="flex items-center gap-2 min-w-0">
+      <slot name="breadcrumb" />
+      <div v-if="$slots.breadcrumb" class="text-gray-300">/</div>
+      <h1 class="text-[15px] font-semibold tracking-tight truncate text-gray-800">{{ title }}</h1>
+      <span v-if="subtitle" class="text-[12px] text-gray-400 truncate hidden sm:inline">{{ subtitle }}</span>
     </div>
-  </div>
+  </Teleport>
+
+  <!-- Teleport action buttons into navbar right section -->
+  <Teleport v-if="mounted" to="#navbar-page-actions">
+    <slot name="actions" />
+  </Teleport>
 </template>
