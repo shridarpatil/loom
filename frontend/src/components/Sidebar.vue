@@ -1,13 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
-import { useTheme } from "@/composables/useTheme";
-import { useSession } from "@/composables/useSession";
-
 const router = useRouter();
 const route = useRoute();
-const { theme } = useTheme();
-const { user, logout } = useSession();
 const collapsed = ref(false);
 
 interface WorkspaceItem {
@@ -103,11 +98,6 @@ function isActive(path: string): boolean {
 
 function navigate(path: string) {
   router.push(path);
-}
-
-async function doLogout() {
-  await logout();
-  router.replace("/login");
 }
 
 onMounted(async () => {

@@ -370,7 +370,7 @@ watch(() => props.appName, loadApp);
           >
             <div
               class="w-[52px] h-[52px] rounded-2xl flex items-center justify-center shadow-sm transition-transform group-hover:scale-105 group-hover:shadow-md"
-              :style="{ backgroundColor: (app.color || '#6366f1') + '18', color: app.color || '#6366f1' }"
+              :style="{ backgroundColor: (app?.color || '#6366f1') + '18', color: app?.color || '#6366f1' }"
             >
               <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                 <path stroke-linecap="round" stroke-linejoin="round" :d="getIconPath(item.icon)" />
