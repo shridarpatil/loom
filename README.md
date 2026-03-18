@@ -143,4 +143,4 @@ loom console                        # Interactive Rhai REPL
 
 ## License
 
-MIT
+AGPL-3.0
